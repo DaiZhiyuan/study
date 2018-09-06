@@ -241,6 +241,23 @@ Perf top的参数较多，本文只介绍几个常用的参数的使用方法。
 
 &nbsp;&nbsp;&nbsp;&nbsp; '-K' or '--hide_kernel_symbols' :不显示属于内核的符号。对于只想分析应用程序的用户而言，使用此参数后，perf top的界面会清爽很多。
 
+&nbsp;&nbsp;&nbsp;&nbsp; '-m' or '--mmap-pages' <n> :指定perf开辟的mmap页面的数量。mmap缓存主要用于用户空间与内核空间的数据通信。perf在内核中驱动将采集到的性能数据存入ring buffer，用户空间的分析程序则通过mmap机制从ring buffer中读取数据。
+
+&nbsp;&nbsp;&nbsp;&nbsp;默认情况下，mmap的页面数量为128，此时mmap内存区域的大小为512KB。perf top默认每个2s读取一次性能数据，当内核生成性能数据的速度过快时，就可能因为缓冲区满导致数据丢失，从而影响到分析结果。在此情况下，用户可以通过'-m'参数扩大缓冲区，以避免性能数据的大量丢失。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-r' or '--realtime' <n> <n>：指定分析程序的实时优先级。如上文所述，如果perf分析程序读取数据的速度长期小于内核生成数据的速度时，就可能导致采样数据的大量丢失，影响分析精度。在系统负载过高时，分析程序可能会因为调度延迟过高而不能及时读取数据。因此，在高负载系统中可以通过参数'-r'将分析程序设置为实时进程，并为其设定较高的优先级。
+> $> perf top -r 0
+
+&nbsp;&nbsp;&nbsp;&nbsp;上述命令中，0即为指定给分析程序的实时优先级。顺便说一句，Linux中实时优先级的范围是[0,99]，其中优先级0最高。不要与范围是[-20,19]的nice值搞混。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-d' or '--delay' <n>：指定perf top页面的刷新周期，<n>的单位为妙。默认值为2s。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-D' or '--dump-symtab' ：打印DSO的符号表，此功能主要用于perf自身的调试。该参数仅与'--stdio'（即TTY界面）配合使用时才起作用。启用此参数后，perf top会在退出时打印所有DSO的符号表。
+
+//todo
+
+
+
 # 5 Perf 编译安装
 
 ## 5.1 测试
