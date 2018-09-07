@@ -1,5 +1,21 @@
 **Linux性能剖析工具Perf**
-[TOC]
+- 1 概述
+- 2 Perf 编译安装
+    - 2.1 测试
+    - 2.2 编译
+    - 2.3 安装
+    - 2.4 帮助文档
+- 3 Perf简介
+    - 3.1 Perf的基本原理
+    - 3.2 Perf的功能概述
+- 4 Perf工具和性能事件
+    - 4.1 perf list简介
+    - 4.2 性能事件与属性
+        - 4.2.1 性能事件的精度级别
+        - 4.2.2 性能事件的属性
+- 5 Perf top工具
+    - 5.1 Perf top的基本使用方法
+    - 5.2 Perf top的参数介绍
 
 # 1 概述
 &nbsp;&nbsp;&nbsp;&nbsp;系统级性能优化是指为了提高应用程序对操作系统资源与硬件资源的使用效率，
@@ -11,9 +27,37 @@
 
 &nbsp;&nbsp;&nbsp;&nbsp;在优化阶段往往需要凭借开发者的经验，编写简洁高效的代码，甚至在汇编级别合理使用各种指令，合理安排各种指令的执行顺序。而在性能剖析阶段，则需要借助于现有的profiling工具。
 
-# 2 Perf简介
 
-## 2.1 Perf的基本原理
+# 2 Perf 编译安装
+
+## 2.1 测试
+```
+[root@centos7 linux-3.10.0-693]# make -C tools/perf -f tests/make
+```
+
+## 2.2 编译
+```
+[root@centos7 linux-3.10.0-693]# make -C tools/perf
+```
+
+## 2.3 安装
+```
+[root@centos7 linux-3.10.0-693]# make -C tools/perf install
+```
+
+## 2.4 帮助文档
+```
+man 1 perf
+man 1 perf-stat
+man 1 perf-top
+man 1 perf-record
+man 1 perf-report
+man 1 perf-list
+```
+
+# 3 Perf简介
+
+## 3.1 Perf的基本原理
 
 &nbsp;&nbsp;&nbsp;&nbsp;Perf是内置于Linux源代码树中的性能剖析(profiling)工具。它基于事件采样原理，以性能事件为基础，支持针对处理器相关性能指标与操作系统相关性能指标的性能剖析。可用于性能瓶颈的查找与热点代码的定位。
 
@@ -83,12 +127,12 @@ int main(void)
 
 &nbsp;&nbsp;&nbsp;&nbsp;根据上述的perf采样原理可以得知，perf假设两次采样之间，即两次相邻的PMI中断之间系统执行的是同一个进程的同一个函数。这种假设会带来一定的误差，当感觉perf给出的结果不准时，不妨提高采样频率，perf会给出更加精确的结果。
 
-## 2.2 Perf的功能概述
+## 3.2 Perf的功能概述
 
 &nbsp;&nbsp;&nbsp;&nbsp;Perf是一个包含27种子工具的工具集，功能很全面。
 
-No. | sub-command | Comment
----|---|---
+No.|sub-commands|comment
+:------:|------:|:------
 01 | annotate      |根据数据文件，注解被采样到的函数，显示指令级别的热点。
 02 | archive       |根据数据文件中记录的build-id，将所有被采样到的ELF文件打成压缩包。利用此压缩包，可以在任何机器上分析数据文件中的采样数据。
 03 | bench         |Perf中内置的benchmark，目前包括两套针对调度器和内存管理子系统的benchmark。
@@ -117,9 +161,9 @@ No. | sub-command | Comment
 26 | probe         |用于定义动态检查点。
 27 | trace         |类似strace功能。
 
-# 3 Perf工具和性能事件
+# 4 Perf工具和性能事件
 
-## 3.1 perf list简介
+## 4.1 perf list简介
 
 &nbsp;&nbsp;&nbsp;&nbsp;利用perf剖析程序性能时，需要指定当前测试的性能事件。性能事件是指在处理器或操作系统中发生的，可能影响到程序性能的硬件事件或软件事件。比如Cache丢失，流水线停顿，页面交换等。这些事件会对程序的执行时间造成较大的负面影响。在优化代码时，应尽可能减少此类事件发生。因此，必须先利用perf等性能剖析工具查找引发这些性能事件的热点代码以及热点指令。perf定义的性能事件分为3类，分别是硬件性能事件、软件性能事件与Tracepoint Events。
 
@@ -132,14 +176,14 @@ No. | sub-command | Comment
 ![image](./images/0x02.png)
 
 
-## 3.2 性能事件与属性
+## 4.2 性能事件与属性
 
 &nbsp;&nbsp;&nbsp;&nbsp;硬件性能事件由处理器的PMU提供支持。如前文所述，perf会对PMI中断发生时的PC寄存器进行采样。由于现代处理器的主频非常高，在加上深度流水线机制，从性能事件被触发，到处理器响应PMI中断，流水线上可能已处理过百条指令。那么PMI中断采到的指令地址就不再是处罚性能事件的那条指令的地址了，而可能具有非常严重的偏差。为了解决这个问题，intel处理器通过PEBS（Precise Event Based Sampling）机制实现了高精度事件采样。PEBS通过硬件在计数器溢出时将处理器现场直接保存到内存（而不是在相应中断时才保存寄存器现场），从而使得perf能够真正触发性能事件的那条指令的地址，提高了采样精度。在默认条件下，perf不使用PEBS机制。用户如果想要使用高精度采样，需要在指定性能事件时，在事件后调价后缀":p"或":pp"。
 
 例如：
 > $> perf top -e cycles:pp
 
-### 3.2.1 性能事件的精度级别
+### 4.2.1 性能事件的精度级别
 
 Level | Comment
 ---|---
@@ -152,7 +196,7 @@ Level | Comment
 
 &nbsp;&nbsp;&nbsp;&nbsp;除了精度级别以外，事件还具有其他几个属性，均可以通过"event:X"的方式予以指定。
 
-### 3.2.2 性能事件的属性
+### 4.2.2 性能事件的属性
 
 attribute | Comment
 ---|---
@@ -178,9 +222,9 @@ Event Num. | Umask Value | Event Mask Mnemonic | Description
 &nbsp;&nbsp;&nbsp;&nbsp;便可以通过以下方式使用此事件：
 > $> perf stat -e r010b ls
 
-# 4 Perf top工具
+# 5 Perf top工具
 
-## 4.1 Perf top的基本使用方法
+## 5.1 Perf top的基本使用方法
 &nbsp;&nbsp;&nbsp;&nbsp;top工具主要用于实时剖析各个函数在某个性能事件上的热度。利用perf top，能够直观地观察到当前的热点函数，并利用工具中内置的annotate功能，进一步查找特点指令。
 
 ![image](./images/0x03.png)
@@ -209,7 +253,7 @@ perf top的基本使用方法为：
 &nbsp;&nbsp;&nbsp;&nbsp;类似于热键'd'，热键't'能够过滤所有不属于当前符号所属线程的符号。
 &nbsp;&nbsp;&nbsp;&nbsp;热键'P'可以将pref top的当前显示的信息输出到文件perf.hist.X中。
 
-## 4.2 Perf top的参数介绍
+## 5.2 Perf top的参数介绍
 
 Perf top的参数较多，本文只介绍几个常用的参数的使用方法。
 
@@ -254,34 +298,56 @@ Perf top的参数较多，本文只介绍几个常用的参数的使用方法。
 
 &nbsp;&nbsp;&nbsp;&nbsp; '-D' or '--dump-symtab' ：打印DSO的符号表，此功能主要用于perf自身的调试。该参数仅与'--stdio'（即TTY界面）配合使用时才起作用。启用此参数后，perf top会在退出时打印所有DSO的符号表。
 
-//todo
+&nbsp;&nbsp;&nbsp;&nbsp; '-f' or '--count-filter' <n>：此参数主要用于符号过滤。指定此参数后，页面上将仅显示采样数大于<n>的符号。
 
+&nbsp;&nbsp;&nbsp;&nbsp; '-g' or '--group'：将计数器组合成计数器组。Perf在默认情况下会为每个计数器创建一个独立的ring buffer。如果将计数器组合成计数器组，perf则会将所有counter的数据输出到group leader的ring buffer中。当内核生成采样数据不多并且内存较为紧张时，可采用此参数以节省内存。
 
+&nbsp;&nbsp;&nbsp;&nbsp; '-i' or '--inherit'：采用此参数后，子进程将自动集成父进程的性能事件。从而使得perf能够采集到动态创建的进程的性能数据。但是当采用'-p'参数仅分析特定进程的性能数据时，继承机制会被禁用。这主要是出于性能的考虑。
 
-# 5 Perf 编译安装
+&nbsp;&nbsp;&nbsp;&nbsp; '--sym-annotate' <symbol name>：指定待解析的符号名。
 
-## 5.1 测试
-```
-[root@centos7 linux-3.10.0-693]# make -C tools/perf -f tests/make
-```
+&nbsp;&nbsp;&nbsp;&nbsp; '-z' or '--zero'：更新页面的数据后，清除历史信息。
 
-## 5.2 编译
-```
-[root@centos7 linux-3.10.0-693]# make -C tools/perf
-```
+&nbsp;&nbsp;&nbsp;&nbsp; '-F' or '--freq' <n>：指定采样频率，此参数与'-c'参数指定一个即可。两个参数同时指定时，perf仅使用'-c'指定的值作为采样周期。
 
-## 5.3 安装
-```
-[root@centos7 linux-3.10.0-693]# make -C tools/perf install
-```
+&nbsp;&nbsp;&nbsp;&nbsp; '-E' or '--entries' <n>：指定页面上的符号数。如果用户仅希望查看top <n>个符号，可以通过此参数实现。
 
-## 5.4 帮助文档
-```
-man 1 perf
-man 1 perf-stat
-man 1 perf-top
-man 1 perf-record
-man 1 perf-report
-man 1 perf-list
-```
+&nbsp;&nbsp;&nbsp;&nbsp; '-U' or '--hide_user_symbols'：仅显示属于内核的符号，隐藏属于用户空间的符号，即类型为[.]的符号。
 
+&nbsp;&nbsp;&nbsp;&nbsp; '--tui'：使用tui界面。tui为perf top的默认界面。如前所述，tui界面需要newt软件包的支持。如果用户打开perf top后，出现的不是tui界面，请检查系统中是否已安装newt包。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '--stdio'：使用TTY页面。当系统中未装newt软件包时，此界面为默认界面。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-v' or '--verbose'：显示冗余信息，如符号地址、符号类型（全局、局部、用户、内核等）。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-s' or '--sort' <key[,key2]...>：指定界面显示的信息，以及这些信息的排序。Perf提供的备选信息有：
+    
+option | comment
+---|---
+Comm | 触发事件的进程名
+PID | 触发事件的进程号
+DOS | 符号所属的DSO的名称
+Symbol | 符号名
+Parent | 调用路径的入口
+
+&nbsp;&nbsp;&nbsp;&nbsp; 当采用如下命令时，perf top会给出更加丰富的信息。
+> $> perf top -s comm,pid,dso,parent,symbol
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-n' or '--show-nr-samples'：显示每个符号对应的采样数量。
+> $> perf top -n 
+
+&nbsp;&nbsp;&nbsp;&nbsp; '--show-total-period'：在界面上显示符号对应的性能事件总数。性能事件计数器在溢出时才会触发一次采样。两次采样之间的计数值即为这段事件内发生的事件总数，perf将其称之为周期（period）。
+
+&nbsp;&nbsp;&nbsp;&nbsp; 使用方法为：
+
+> $>perf top --show-total-period
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-g' or '--call-graph' ：在界面上显示函数的调用图谱。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '--dsos' <dso_name[,dso_name...]>：仅显示dos名为dos_name的符号。可以同时指定多个dso，各个dso名字之间通过逗号隔开。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '--comms' <comm[,comm...]>：仅显示属于进程"comm"的符号。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '--symbols' <symbol[,symbol...]>：仅显示指定的符号。
+
+&nbsp;&nbsp;&nbsp;&nbsp; '-M' or '--disassembler-style'：显示符号注解时，可以通过此参数指定汇编语言的风格。
