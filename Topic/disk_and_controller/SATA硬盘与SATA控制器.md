@@ -6,7 +6,7 @@
 
 在使用QEMU/KVM时，有些场景需要透传PCI设备给GuestOS。
 
-> 例如：将某块磁盘透传给GuestOS，主机上有多块磁盘、多个控制器，那么怎么找出你想要透传的磁盘隶属于哪个控制器并得到BDF，从而完成透传的目的？
+> 例如：将某块磁盘透传给GuestOS，主机上有多块SATA磁盘、多个SATA控制器，那么怎么找出你想要透传的磁盘隶属于哪个控制器并得到BDF，从而完成透传的目的？
 
 
 ## 1.1 获取SATA控制器信息
@@ -37,6 +37,13 @@ lspci - list all PCI devices
 - Intel Corporation 8 Series/C220 Series Chipset Family 6-port SATA Controller 1：厂商信息
 - [AHCI mode]：工作模式
 - (rev 04)：版本信息
+
+> What does "rev" in lspci output mean?
+
+> Revision.
+
+> Different versions of the same model. 
+> Could mean just a different firmware version, but could mean a completely different chipset.
 
 ## 1.2 获取SCSI设备信息
 lsscsi - list SCSI devices (or hosts) and their attributes
