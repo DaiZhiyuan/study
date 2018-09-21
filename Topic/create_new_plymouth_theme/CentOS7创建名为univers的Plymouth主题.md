@@ -30,7 +30,7 @@ Description=Univers CentOS 7 Theme
 ModuleName=script
 
 [script]
-ImageDir=/usr/share/plymouth/themes/univers/
+ImageDir=/usr/share/plymouth/themes/univers
 ScriptFile=/usr/share/plymouth/themes/univers/univers.script
 ```
 
