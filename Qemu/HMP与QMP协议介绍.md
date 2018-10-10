@@ -7,7 +7,7 @@
 Qemu Monito Protocol简称qmp，基于json（rfc4627）的协议，便于其他应用控制qemu。
 qmp是qemu-kvm虚拟机中的一个重要组成部分。如果使用libvirt起一台虚拟机，libvirt使用qmp给qemu发送命令，qemu通过qmp events（qmp事件）返回，所以说qmp是libvirt和qemu之间交互的一个重要通道。
 
-根据http://wiki.qemu.org/QMP中的介绍，现在我们使用的命令还是放在qmp-commands.hx和hmp-commands.hx中，未来希望都放在qapi-schema.json文件中，就像qga（qemu guest agent）的实现方式一样。
+现在我们使用的命令还是放在qmp-commands.hx和hmp-commands.hx中，未来希望都放在qapi-schema.json文件中，就像qga（qemu guest agent）的实现方式一样。
 
 ## 1.1 相关文件
 - qmp-commands.hx
