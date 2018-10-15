@@ -15,14 +15,14 @@ QEMU的以下几个特点：
 
 QEMU与KVM的关系如下：
 
-![image](./images/01.png)
+![image](./images/0x01.png)
 
 
 KVM在物理机启动时创建/dev/kvm设备文件，当创建虚拟机时，KVM为该虚拟机进程创建一个VM的文件描述符，当创建vCPU时，KVM为每个vCPU创建一个文件描述符。同时，KVM向用户空间提供了一系列针对特殊设备文件的ioctl系统调用。QEMU主要是通过ioctl系统调用与KVM进行交互的。
 
 那么QEMU和KVM具体都实现了哪些功能呢？我们用一张图说明：
 
-![image](./images/02.png)
+![image](./images/0x02.png)
 
 QEMU所实现的功能包括：虚拟机的配置和创建、虚拟机运行依赖的虚拟设备、虚拟机运行时用户操作环境和交互（vnc）以及一些针对虚拟机的特殊技术（如动态迁移），都是QEMU自己实现的。同时QEMU还实现了利用KVM提供的接口实现虚拟机硬件加速。 
 而KVM的主要功能在于初始化CPU硬件，打开虚拟化模式，然后将虚拟客户机运行在虚拟机模式下，并对虚拟客户机的运行提供支持，这些支持主要是以针对相关的特殊设备文件的ioctl系统调用。外设的模拟一般不会由KVM负责，只有对性能要求较高的虚拟设备，如虚拟中断控制器和虚拟时钟，是由KVM模拟的，这样可以大量减少处理器的模式转换的开销。
@@ -30,19 +30,19 @@ QEMU所实现的功能包括：虚拟机的配置和创建、虚拟机运行依�
 
 # 3. KVM架构
 
-![image](./images/03.png)
+![image](./images/0x03.png)
 
 
 ## 3.1 EPT
 
-![image](./images/04.png)
+![image](./images/0x04.png)
 
 
 # 4. QEMU的代码结构
 
 线程事件驱动模型
 
-![image](./images/05.png)
+![image](./images/0x05.png)
 
 
 QEMU的体系结构正如上图展示的——每个vCPU都是一个线程，这些vCPU线程可以运行客户机的代码，以及虚拟中断控制器、虚拟时钟的模拟。而Main loop主线程则是Event-driver的，通过轮询文件描述符，调用对应的回调函数，处理由Monitor发出的命令、Timers超时，并且实现VNC、完成IO等功能。 
