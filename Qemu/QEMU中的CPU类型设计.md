@@ -52,7 +52,7 @@ x86             host  KVM processor with all supported host features (only avail
 
 CPUClass的数据结构如下，其中最主要的内容，是与CPU相关的大量的回调函数，通过给这些回调函数的指针赋值，对应的CPUState就可以调用这些函数实现相应的功能。
 
-```
+```c
 typedef struct CPUClass {
     /*< private >*/
     DeviceClass parent_class;
@@ -114,7 +114,7 @@ typedef struct CPUClass {
 
 CPUState是CPU对象的数据结构，一个CPUState就表示一个虚拟机的CPU。在QEMU中，任何CPU的操作的大部分都是对以CPUState形式出现的CPU来进行的。
 
-```
+```c
 struct CPUState {
     /*< private >*/
     DeviceState parent_obj;    //继承自Device对象
@@ -209,16 +209,18 @@ struct CPUState {
 
 与CPU相关的重要全局变量，一个是全局cpus，它的定义如下。它保存了虚拟机中所有的CPUState的指针，用于对CPU的集中管理。代码在exec.c中。
 
-```
+```c
 QTAILQ_HEAD(CPUTailQ, CPUState);
 struct CPUTailQ cpus = QTAILQ_HEAD_INITIALIZER(cpus);
 ```
 
 另一个是在线程内的全局变量，它的定义如下：
 
+```c
+__thread CPUState *current_cpu;
 ```
+
 它用于给CPU线程指示当前的CPUState的指针。方便调用CPUClass中的相关回调函数对当前的CPUState进行管理。
-```
 
 ## 3. X86 CPU的设计
 作为一种架构的CPU，X86 CPU类继承自CPU的基类，对应的类和对象的数据结构，分别是X86CPUClass和X86CPUState。
@@ -226,7 +228,7 @@ struct CPUTailQ cpus = QTAILQ_HEAD_INITIALIZER(cpus);
 ## 3.1 X86CPUClass
 
 X86CPUClass是X86CPU类的数据结构，定义在target-i386/cpu-qom.h中
-```
+```c
 typedef struct X86CPUClass {
     /*< private >*/
     CPUClass parent_class; //继承自CPU类
@@ -243,7 +245,7 @@ typedef struct X86CPUClass {
 ```
 
 其中X86CPUDefinition的定义如下：（代码在target-i386/cpu.c中）
-```
+```c
 struct X86CPUDefinition {
     const char *name;
     uint32_t level;
@@ -265,7 +267,7 @@ struct X86CPUDefinition {
 
 X86CPU是x86架构CPU的对象的数据结构，定义在target-i386/cpu-qom.h中
 
-```
+```c
 typedef struct X86CPU {
     /*< private >*/
     CPUState parent_obj;
