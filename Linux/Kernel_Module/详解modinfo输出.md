@@ -24,7 +24,7 @@ vermagic:       3.10.0-693.el7.x86_64 SMP mod_unload modversion
 
 > firmware: i915/bxt_guc_ver8_7.bin
 
-Many devices need two things to run properly. A driver and a firmware. The driver requests the firmware from the filesystem at /lib/firmware. This is a special file, needed by the hardware, it's not a binary. The diver then does what it needs to do to load the firmware into the device. The firmware does programming the hardware inside the device.
+很多设备需要两样东西才能工作，驱动和固件。这个驱动依赖固件，固件从文件系统/lib/firmware读取。
 
 - alias字段
 
