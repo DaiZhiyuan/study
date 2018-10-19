@@ -48,8 +48,9 @@ https://github.com/git/git/compare/master…next
 - 使用_或-来让URI可读性更好
 
 曾经Web上的URI都是冰冷的数字或者无意义的字符串，但现在越来越多的网站使用_或-来分隔一些单词，让URI看上去更为人性化。 例如国内比较出名的开源中国社区，它上面的新闻地址就采用这种风格， 如:
-
-> http://www.oschina.net/news/38119/oschina-translate-reward-plan
+```
+http://www.oschina.net/news/38119/oschina-translate-reward-plan
+```
 
 - 使用/来表示资源的层级关系
 
