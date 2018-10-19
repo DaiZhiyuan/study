@@ -1,16 +1,14 @@
 [TOC]
 
-# 1. 安装配置NTP服务
+# 1. 配置NTP服务器
 
+## 1.1 安装Chrony
 ```
-[root@lab ~]# yum -y install ntp
+[root@lab ~]# yum -y install chrony
 
-[root@lab ~]# vi /etc/ntp.conf
+[root@lab ~]# vi /etc/chrony.conf
 
-# line 18: add the network range you allow to receive requests
-restrict 10.0.0.0 mask 255.255.255.0 nomodify notrap
-
-# change servers for synchronization
+# line 3: change servers for synchronization
 #server 0.centos.pool.ntp.org iburst
 #server 1.centos.pool.ntp.org iburst
 #server 2.centos.pool.ntp.org iburst
@@ -19,10 +17,15 @@ server ntp1.jst.mfeed.ad.jp iburst
 server ntp2.jst.mfeed.ad.jp iburst
 server ntp3.jst.mfeed.ad.jp iburst
 
-[root@dlp ~]# systemctl start ntpd 
-[root@dlp ~]# systemctl enable ntpd 
+# line 25: add the network range you allow to receive requests
+allow 10.0.0.0/24
+
+[root@lab ~]# systemctl start chronyd 
+[root@lab ~]# systemctl enable chronyd 
 ```
-# 2. 添加防火墙规则
+## 1.2 添加防火墙规则
+
+NTP服务：使用UDP协议123号端口。
 
 ```Shell
 [root@lab ~]# firewall-cmd --add-service=ntp --permanent 
@@ -32,13 +35,25 @@ success
 success
 ```
 
-# 3. 验证服务可用性
+## 1.3 验证服务可用性
 
 ```Shell
-[root@lab ~]# ntpq -p
-     remote           refid      st t when poll reach   delay   offset  jitter
-==============================================================================
-+ntp1.jst.mfeed. 172.29.1.100     2 u   29   64    1   18.826   -0.126   0.000
-+ntp2.jst.mfeed. 172.29.2.50      2 u   28   64    1   21.592    0.018   0.000
-*ntp3.jst.mfeed. 133.243.236.18   2 u   28   64    1   22.666   -1.033   0.000
+[root@lab ~]# chronyc sources 
+210 Number of sources = 3
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^+ ntp1.jst.mfeed.ad.jp          2   6    17     8  -1028us[-1261us] +/-   14ms
+^* ntp2.jst.mfeed.ad.jp          2   6    17     8  -1241us[-1474us] +/-   15ms
+^? ntp3.jst.mfeed.ad.jp          0   6     0   10y     +0ns[   +0ns] +/-    0ns
+```
+
+# 2. 安装配置NTP客户端
+
+```Shell
+[root@lab ~]# yum -y install ntpdate
+
+[root@lab ~]# ntpdate ntp1.jst.mfeed.ad.jp 
+24 Jan 11:35:15 ntpdate[5740]: adjust time server xxx.xxx.xxx.xxx offset 0.004626 sec
+
+[root@lab ~]# systemctl enable ntpdate 
 ```

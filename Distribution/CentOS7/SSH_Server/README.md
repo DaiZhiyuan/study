@@ -15,6 +15,8 @@ PermitRootLogin no
 
 ## 1.2 添加防火墙策略
 
+SSH服务：使用TCP协议22号端口。
+
 ```Shell
 [root@lab ~]# firewall-cmd --add-service=ssh --permanent 
 success
