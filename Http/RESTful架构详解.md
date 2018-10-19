@@ -33,19 +33,23 @@ REST全称是表述性状态转移，那究竟指的是什么的表述？
 
 要让一个资源可以被识别，需要有个唯一标识，在Web中这个唯一标识就是URI(Uniform Resource Identifier)。 URI既可以看成是资源的地址，也可以看成是资源的名称。如果某些信息没有使用URI来表示，那它就不能算是一个资源， 只能算是资源的一些信息而已。URI的设计应该遵循可寻址性原则，具有自描述性，需要在形式上给人以直觉上的关联。这里以github网站为例，给出一些还算不错的URI：
 
-- https://github.com/git
-- https://github.com/git/git
-- https://github.com/git/git/blob/master/block-sha1/sha1.h
-- https://github.com/git/git/commit/e3af72cdafab5993d18fae056f87e1d675913d08
-- https://github.com/git/git/pulls
-- https://github.com/git/git/pulls?state=closed
-- https://github.com/git/git/compare/master…next
+```
+https://github.com/git
+https://github.com/git/git
+https://github.com/git/git/blob/master/block-sha1/sha1.h
+https://github.com/git/git/commit/e3af72cdafab5993d18fae056f87e1d675913d08
+https://github.com/git/git/pulls
+https://github.com/git/git/pulls?state=closed
+https://github.com/git/git/compare/master…next
+```
 
 下面让我们来看看URI设计上的一些技巧:
 
 - 使用_或-来让URI可读性更好
 
-曾经Web上的URI都是冰冷的数字或者无意义的字符串，但现在越来越多的网站使用_或-来分隔一些单词，让URI看上去更为人性化。 例如国内比较出名的开源中国社区，它上面的新闻地址就采用这种风格， 如http://www.oschina.net/news/38119/oschina-translate-reward-plan。
+曾经Web上的URI都是冰冷的数字或者无意义的字符串，但现在越来越多的网站使用_或-来分隔一些单词，让URI看上去更为人性化。 例如国内比较出名的开源中国社区，它上面的新闻地址就采用这种风格， 如:
+
+> http://www.oschina.net/news/38119/oschina-translate-reward-plan
 
 - 使用/来表示资源的层级关系
 
@@ -200,9 +204,12 @@ HTTP的响应代码可用于应付不同场合，正确使用这些状态代码�
 1. **API在URI里边带上版本号**
 
 在URI里边带上版本号，例如:
-- http://api.example.com/1.0/foo
-- http://api.example.com/1.2/foo
-- http://api.example.com/2.0/foo
+
+```
+http://api.example.com/1.0/foo
+http://api.example.com/1.2/foo
+http://api.example.com/2.0/foo
+```
 
 如果我们把版本号理解成资源的不同表述形式的话，就应该只是用一个URL，并通过Accept头部来区分，还是以github为例，它的Accept的完整格式是：
 ```
