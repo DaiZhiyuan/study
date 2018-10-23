@@ -1,4 +1,12 @@
-[TOC]
+- 1 Dnsmasq
+    - 1.1 安装Dnsmasq
+    - 1.2 配置Dnsmasq
+    - 1.3 配置静态主机名解析
+    - 1.4 增加防火墙规则
+    - 1.5 测试解析域名
+- 2 启动DHCP功能
+    - 2.1 配置Dnsmasq
+    - 2.2 添加防火墙规则
 
 # 1. Dnsmasq
 
@@ -61,7 +69,7 @@ success
 success
 ```
 
-## 1.4 测试解析域名
+## 1.5 测试解析域名
 
 ```
 [root@desktop ~]# yum -y install bind-utils

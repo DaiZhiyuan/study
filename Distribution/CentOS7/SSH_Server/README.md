@@ -1,4 +1,31 @@
-[TOC]
+- 1 密码认证
+    - 1.1 阻止root用户远程登录
+    - 1.2 添加防火墙策略
+    - 1.3 安装SSH客户端
+    - 1.4 链接SSH服务器
+    - 1.4 在SSH服务器上执行命令
+- 2 使用SSH传输文件
+    - 2.1 使用SCP(Secure Copy)传输文件
+    - 2.2 使用SFTP(SSH File Transfer Protocol)传输文件
+- 3 秘钥认证
+    - 3.1 创建秘钥对
+    - 3.2 将公钥传输到SSH服务器
+    - 3.3 禁用密码登录
+- 4 仅启用SFTP服务
+    - 4.1 设置/home为sftp的根目录
+    - 4.2 验证服务配置
+- 5 SSH端口转发
+    - 5.1 将主机的TCP协议的8081端口数据转发到5901端口上
+- 6 SSH X11转发
+    - 6.1 SSH服务开启X11转发
+    - 6.2 SSH客户端使用方式
+- 7 SSHPass
+    - 7.1 安装SSHPass
+    - 7.2 使用SSHPass
+- 8 SSH-Agent
+- 9 Parallel SSH
+    - 9.1 安装PSSH
+    - 9.2 使用PSSH
 
 # 1. 密码认证
 
@@ -45,7 +72,7 @@ JerryDai@lab.centos.org's password:      # password of the user
 [JerryDai@lab ~]$     # just logined
 ```
 
-## 1.4 在SSH服务器上执行命令
+## 1.5 在SSH服务器上执行命令
 
 ```Shell
 # for example, execute [cat /etc/passwd]
