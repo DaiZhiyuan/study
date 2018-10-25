@@ -53,7 +53,7 @@ success
 success
 ```
 
-## 1.3 更新SELinux上下文
+## 1.3 更新SELinux策略
 
 ```Shell
 [root@smb ~]# setsebool -P samba_enable_home_dirs on 
