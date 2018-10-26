@@ -329,7 +329,7 @@ UserDir Test Page
 2. 创建测试页面
 
 ```PHP
-[cent@www ~]$ vi ~/public_html/virtual.php
+[JerryDai@www ~]$ vi ~/public_html/virtual.php
 <html>
 <body>
 <div style="width: 100%; font-size: 40px; font-weight: bold; text-align: center;">
