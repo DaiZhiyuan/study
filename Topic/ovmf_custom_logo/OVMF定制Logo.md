@@ -75,8 +75,11 @@ make -C edk2/BaseTools
 
 ## 2.4 直接编译
 
-> #> git submodule update --force --init --recursive
-> #> build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -DSECURE_BOOT_ENABLE -t GCC48 -b RELEASE --cmd-len=65536 --hash
+```bash
+#> git submodule update --force --init --recursive
+#> build -a X64 -p MdeModulePkg/MdeModulePkg.dsc -t GCC48 -b RELEASE
+#> build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -DSECURE_BOOT_ENABLE -t GCC48 -b RELEASE --cmd-len=65536 --hash
+```
 
 ## 2.5 重新配置
 
