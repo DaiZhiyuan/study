@@ -305,8 +305,8 @@ logrotate是一个日志管理程序，用来把旧的日志文件删除（备�
 logrotate的执行由anacron服务来完成。在/etc/cron.daily目录中，有个文件logrotate，它实际上是个shell script，用来启动logrotate。
 
 Linux下计划任务at、crontab与anacron区别：
-- at -- 计划任务（依赖于atd服务）
-- crontab -- 周期性计划任务（依赖crond服务）
+- at -- 一次性计划任务（依赖于atd服务）
+- crontab -- 用户级周期性计划任务（依赖crond服务）
 - anacron -- 系统级周期性计划任务（依赖于anacron服务)
 
 crontab与anacron比较：
@@ -444,7 +444,7 @@ btmp begins Mon Dec  3 14:23:02 2018
 因此随着系统正常运行时间的增加，该文件的大小也会越来越大，增加的速度取决于系统用户登录的次数。该日志文件可以用来查看用户的登录记录，
 last命令就通过访问这个文件获得这些信息，并以反序从后向前显示用户的登录记录，last也能根据用户、终端tty或时间显示相应的记录。
  
-使用lst命令查看：
+使用last命令查看：
 ```bash
 [root@CentOS7u4 ~]# last
 root     pts/0        :0               Mon Dec 10 02:46   still logged in   
@@ -468,12 +468,12 @@ root     :0           :0               Thu Nov 22 02:32 - down   (02:07)
 ```
 
 last命令常用参数：
--a : 把从何处登入系统的主机名称或IP地址，显示在最后一行。
--d ：将IP地址转换成主机名称。
--f : 指定记录文件。
--n ：设置列出名单的显示列数。
--R ：不显示登入系统的主机名称或IP地址。
--x ：显示系统关机，重新开机，以及执行等级的改变等信息。
+- -a : 把从何处登入系统的主机名称或IP地址，显示在最后一行。
+- -d ：将IP地址转换成主机名称。
+- -f : 指定记录文件。
+- -n ：设置列出名单的显示列数。
+- -R ：不显示登入系统的主机名称或IP地址。
+- -x ：显示系统关机，重新开机，以及执行等级的改变等信息。
 
 ### 2.2.3 /var/account/pacct
 
