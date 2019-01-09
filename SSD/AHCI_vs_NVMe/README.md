@@ -54,3 +54,5 @@ PCIe热插拔并不是完全由操作系统处理的，也有可能由BIOS处理
 ![image](./images/0x01.png)
 
 ![image](./images/0x02.png)
+
+![image](./images/SATA_Express_interface.svg)
