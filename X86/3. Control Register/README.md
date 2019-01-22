@@ -30,7 +30,7 @@
 ![image](./images/0x01.png)
 
 - CR0与CR4组合起来对处理器提供了根本的控制，比如处理器的工作模式和一些模式中使用的特色功能。
-- CR2和CR3被使用在保护模式的页管理机制中。CR2保存着访问内存时引发#PF异常的线性地址值（典型地如：当访问一个页时，它不再内存中（未映射）或者没有对她进行访问的权限而引发#PF异常）。CR3提供整个页转换结构表的基地址，这个基地址是物理地址。
+- CR2和CR3被使用在保护模式的页管理机制中。CR2保存着访问内存时引发#PF异常的线性地址值（典型地如：当访问一个页时，它不再内存中（未映射）或者没有对它进行访问的权限而引发#PF异常）。CR3提供整个页转换结构表的基地址，这个基地址是物理地址。
 
 # 2. CR8
 
@@ -38,7 +38,7 @@ CR8又被称为Task Priority Register（任务优先级寄存器），它在64�
 
 ![image](./images/0x02.png)
 
-CR8的低4位（bit3 ~ bit0）提供一个Priority Level值，这个值为0 ~ 15，将控制处理器可以响应的中断级别，这个中断属于maskbale（可屏蔽的）硬件中断。如果这个值被设为0，则可能响应所有的中断，如果设为15则处理器不会响应所有的中断。
+CR8的低4位（bit3 ~ bit0）提供一个Priority Level值，这个值为0 ~ 15，将控制处理器可以响应的中断级别，这个中断属于maskable（可屏蔽的）硬件中断。如果这个值被设为0，则可能响应所有的中断，如果设为15则处理器不会响应所有的中断。
 
 ## 2.1 中断优先级别
 
@@ -96,7 +96,7 @@ CR0里有许多重要的控制位，其中最重要的一个是PE控制位，它
 
 处理器在初始化后，CR.PE=0则处于实模式状态。当置CR0.PE=1时，表示处理器处于保护模式状态下，处理器将按照保护模式下的行为进行运作。
 
-> 位处理器提供保护模式的执行环境，这是系统软件的职责。处理器只负责按照保护模式的规则运行。
+> 为处理器提供保护模式的执行环境，这是系统软件的职责。处理器只负责按照保护模式的规则运行。
 
 ## 4.2 x87 FPU单元的执行环境
 
@@ -110,7 +110,7 @@ x87 FPU的执行环境涉及4个控制位：CR0.NE、CR0.EM、CR0.TS、CR0.MP控
 ## 4.3 CR0.PG控制位
 
 CR0.PG置1时将开启页式管理机制。开启页式管理前必须要打开保护模式，否则将产生#GP异常。
-显然在打开页式管理机制之前，应该先构造号整个页转换结构表，一旦CR0.PG被置位，则表示马上使用分页机制。
+显然在打开页式管理机制之前，应该先构造好整个页转换结构表，一旦CR0.PG被置位，则表示马上使用分页机制。
 
 在页式内存管理机制中，虚拟地址被映射到物理地址上，物理地址的寻址范围可以超过虚拟地址。典型地如：可以将一个32位宽的线性地址空间映射在36位宽的物理地址空间上。
 
@@ -121,7 +121,7 @@ CR0.CD（Cache Disable）与CR0.NW（Not Write-Through）结合起来对处理�
 - 当NW=1时，处理器不维护memeory的一致性。
 
 通俗地讲：当CD=1时表示memeory的cache是Disable状态，对新的memory访问时，不会被加载到Cache中；
-而NW=1时，表示Not Write-Through（不直写），不回写memeory。
+而NW=1时，表示Not Write-Through（不直写），回写memeory。
 
 CR0.CD与CR0.NW是组合使用的，Intel明确列出它们组合产生的影响，当CD=0而NW=1时，这是错误的，会产生#GP异常（表明：memeory cache是开启的，但是却不维护memeory的一致性，显然不正确）；CD=0且NW=0时对cache的正常使用方法，表明：memeory cache开启页需要维护memeory的一致性。
 
@@ -131,7 +131,7 @@ Intel处理器上使用MESI（Modified，Exclusive，Shared，Invalid）协议�
 
 ![image](./images/0x06.png)
 
-当cache line的状态时M，E，S时cache是有效的。位I状态时，cache line失效将被写往memory上，当发生cache write hit（写cache）时，S状态改为M状态（共享cache line被标记为已经改写），这是对应的memory的数据时失效的。
+当cache line的状态时M，E，S时cache是有效的。为I状态时，cache line失效将被写往memory上，当发生cache write hit（写cache）时，S状态改为M状态（共享cache line被标记为已经改写），这是对应的memory的数据是失效的。
 
 当这个M状态的cache line变为I（Invalid）状态时，处理器会写往memory，保证memory数据保持同步有效。系统软件页可以使用INVD指令发起置cache line无效，强迫写往memory（data cache不回写，将丢失），使用WBINVD指令回写所有Modified状态的cache line并使这些cache line置为I状态。CFLUSH指令提供一个需要flush的地址，将包含这个地址的cache line回写到memory上。
 
@@ -214,7 +214,7 @@ VMXE与SMXE控制位仅在Intel上使用，AMD机器上是保留位。
 > CR4.PCIDE需要处理器支持，可检查从CPUID.EAX=01H返回的ECX[17].PCID位看是否得到支持。
 
 CR4.SMEP仅在Intel处理器上支持，它控制supervisor权限的程序仅能执行具有supervisor权限的代码页。
-当页具有可执行权限时（页表项的XD=0），设CR4.SMEP=1则只是，在supervisor权限下只能执行U/S位为0（级：Supervisor权限）的页而不能执行user权限的代码。
+当页具有可执行权限时（页表项的XD=0），设CR4.SMEP=1则指示，在supervisor权限下只能执行U/S位为0（即：Supervisor权限）的页而不能执行user权限的代码。
 
 > 具有可执行权限的页是指：EFER.NEX=0（表示Execution Disable技术不被支持）或者在支持NEX技术的情况下，页表项的XD位被清0（表示页可执行）。
 
@@ -251,14 +251,14 @@ EFER是x64体系中新增的寄存器，为了支持long-mode而引入。
 
 ## 6.1 开启long-mode
 
-EFER是MSR中的医院，它的地址是C0000080H，它是x64体系的基石。EFER.LME=1时，开启long mode，代码如下。
+EFER是MSR中的一员，它的地址是C0000080H，它是x64体系的基石。EFER.LME=1时，开启long mode，代码如下。
 ```asm
     mov ecx, IA32_EFER
     rdmsr
     bts eax, 8              ; EFER.LME=1
     wrmsr
 ```
-可是并不代码long mode是生效的，当EFER.LMA=1时才表示处理器目前处于long mode之下。EFER.LMA标志位是由处理器维护的。
+可是并不代表long mode是生效的，当EFER.LMA=1时才表示处理器目前处于long mode之下。EFER.LMA标志位是由处理器维护的。
 
 开启long mode后必须要开启paging内存管理机制。因此，当EFER.LME=1并且CR0.PG=1时，处理器置EFER.LMA为1，表示long mode处于激活状态。
 
