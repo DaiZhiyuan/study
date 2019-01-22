@@ -19,7 +19,7 @@ MSR（Model-Specific Register）是让人头痛的一类寄存器，这类寄存
 
 ## 1.1 MSR由什么作用
 
-MSR提供对硬件和人际相关功能的一些控制。能提供对一些硬件和人际运行环境的设置，许多MSR应在BIOS运行期间设置。
+MSR提供对硬件和软件相关功能的一些控制。能提供对一些硬件和软件运行环境的设置，许多MSR应在BIOS运行期间设置。
 
 下面是Intel列出的MSR的功能：
 1. performance-monitoring counters（性能监视计数器）。
@@ -43,7 +43,7 @@ AMD部分的MSR与Intel是兼容的，但是少了许多特色功能。
     mov ecx, 176H           ; IA32_SYSENTER_EIP寄存器的地址
     rdmsr                   ; 读MSR内容到EDX:EAX寄存器
 ```
-MSR是64位宽的，在上面的代码里读出来的IA32\_SYSENTER_\EIP寄存器值放到EDX:EAX寄存器中，高32位在EDX寄存器，低32位放在EAX寄存器。
+MSR是64位宽的，在上面的代码里读出来的IA32\_SYSENTER\_EIP寄存器值放到EDX:EAX寄存器中，高32位在EDX寄存器，低32位放在EAX寄存器。
 
 在64位环境里rdx和rcx寄存器高32位都被清0。
 ```asm
@@ -57,14 +57,14 @@ MSR是64位宽的，在上面的代码里读出来的IA32\_SYSENTER_\EIP寄存�
 
 若提供MSR地址是保留或未实现的，则执行rdmsr和wrmsr指令会产生#GP异常。
 
-```shell
-[root@lab ~]# rdmsr 0x176
+```bash
+[root@localhost ~]# rdmsr 0x176
 ffffffff81789d10
 ```
 
 # 3. MTRR
 
-先关注MSRR（Memory Type Range Register），MTRR的作用是将memory物理地址划分某些区域，并且可以为这些区域定义不同的memory类型，如下表所示。
+先关注MTRR（Memory Type Range Register），MTRR的作用是将memory物理地址划分某些区域，并且可以为这些区域定义不同的memory类型，如下表所示。
 
 
 Memory类型 | 编码值
@@ -153,12 +153,12 @@ IA32\_MTRR\_PHYSMASK寄存器的PhysMask域（MAXPHYADDR-1:12）给IA32\_MTRR\_P
 PhysMask的值要满足式子1和式子2的等式，根据这个式子求出PhysMask值。
 
 PhysMask值的计算方式是：
-```
+```asm
     1. 3FFFFFh - 200000h =  1FFFFFh        ; range的最大值减最小值
     2. FFFFFFFFFh - 1FFFFFh = FFFE00000h   ; MAXPHYADDR减它们的差
 ```
 算出的结果值FFFE00000h就是在MAXPHYADDR为36位的情况下PhysMask值，这个值可以满足：
-```
+```asm
     1. 200000h & FFFFE00000h = 3FFFFFh & FFFE00000h
     2. 200000h & FFFFE00000h = 300000h & FFFE00000h
 ```
@@ -183,7 +183,7 @@ IA32\_MTRR\_PHYSMASK寄存器的bit11位是Valid位，这个位需要置1，否�
 5. 全部的virtual machine类指令
 
 还有rep movs（串指令），以及debug extensions相关的指令也受到MSR的控制。
-实际上可能会预案不止这些，最好参考MSR列表说明。
+实际上可能会远不止这些，最好参考MSR列表说明。
 
 ## 4.1 支持sysenter/sysexit指令的MSR
 
@@ -215,7 +215,7 @@ Intel不支持syscall/sysret在32位环境下使用。这里的描述以AMD为�
 
 需要注意的是sysret指令所需要的Selector有些微妙之处（如上图所标示的），那是由于syscall/sysret可以在32位和64位环境下使用。当一个32位的代码运行在compatibility模式下调用了64位的系统服务代码，那么必须从64位的系统服务例程返回到32位的代码下，所以产生了这样的需求。
 
-SFMASK寄存器被使用在堆rflags寄存器可以屏蔽某些标志位，当syscall进入目标代码后，SFMASK寄存器的bit被置位则相对应的rflags寄存器标志位被清0，例如，SFMASK[9]=1，则rflags的IF标志位（bit9）被清0，将关闭中断标志。
+SFMASK寄存器被使用在对rflags寄存器可以屏蔽某些标志位，当syscall进入目标代码后，SFMASK寄存器的bit被置位则相对应的rflags寄存器标志位被清0，例如，SFMASK[9]=1，则rflags的IF标志位（bit9）被清0，将关闭中断标志。
 
 另一个设计的MSR是IA32\_EFER，syscall/sysret需要在IA32\_EFER中开启，软件可以再CPUID.EAX=80000001h leaf里返回的EDX[11]位查询syscall指令是否得到支持。
 
@@ -223,8 +223,8 @@ SFMASK寄存器被使用在堆rflags寄存器可以屏蔽某些标志位，当sy
 
 swapgs指令设计两个相关的MSR：
 ```
-1. IA32_KERNEL_GS_BASE寄存器
-2. IA32_GS_BASE寄存器
+1. IA32_KERNEL_GS_BASE
+2. IA32_GS_BASE
 ```
 IA32\_GS\_BASE寄存器用来设置GS寄存器的64位base值，在64位环境下，如果需要对GS寄存器设置64位的base地址，不能通过加载segment descriptor的形式（这里只能加载32位base值），需要通过设置IA32\_GS\_BASE寄存器来达到目的。
 
@@ -236,7 +236,7 @@ swapgs指令的目的是交换GS.Base与IA32\_KERNEL\_GS\_BASE的值，如上图
 
 > 实际上，对系统服务例程来说GS.base原来的值是什么并不重要，swapgs负责将IA32_KERNEL_GS_BASE值装入到GS.base中。
 
-因为在完成系统服务例程后，必须使用swapgs指令在交换会原来的值。在服务历程里GS.base原来的值处于被忽略的状况。
+因为在完成系统服务例程后，必须使用swapgs指令在交换会原来的值。在服务例程里GS.base原来的值处于被忽略的状况。
 ```asm
 system_service:
     swapgs                                  ; 将IA32_KERNEL_GS_BASE值装入GS.base中
