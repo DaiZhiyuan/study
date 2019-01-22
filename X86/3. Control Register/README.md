@@ -1,4 +1,25 @@
-[TOC]
+- 1 概述
+- 2 CR8
+    - 2.1 中断优先级别
+- 3 CR3
+- 4 CR0
+    - 4.1 保护模式位PE
+    - 4.2 x87 FPU单元的执行环境
+    - 4.3 CR0.PG控制位
+    - 4.4 CR0.CD与CR0.NW控制位
+        - 4.4.1 如何维护cache与memory的一致性？
+    - 4.5 CR0.WP控制位
+    - 4.6 CR0.AM控制位
+- 5 CR4
+    - 5.1 CR4.TSD与CR4.PCE控制位
+    - 5.2 CR4.DE与CR4.MCD控制位
+    - 5.3 CR4.OSFXSR控制位
+    - 5.4 CR4.VMXE与CR4.SMXE控制位
+    - 5.5 CR4.PCIDE与CR4.SEMP控制位
+    - 5.6 CR4.OSXSAVE控制位
+    - 5.7 CR4中关于页的控制位
+- 6 EFER扩展功能寄存器
+    - 6.1 开启long-mode
 
 # 1. 概述
 
