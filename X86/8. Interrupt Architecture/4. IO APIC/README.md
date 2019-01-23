@@ -36,7 +36,7 @@ I/O APIC与8259兼容类的中断控制器最大的不同是，8259中断口之�
 I/O APIC的寄存器也是通过内存映射方式映射到处理器物理地址空间。
 I/O APIC的寄存器工作在两种访问方式：
 - 直接访问的寄存器（direct register）
-- 简介访问的寄存器（indirect register）
+- 间接访问的寄存器（indirect register）
 
 **访问I/O APIC寄存器**
 
