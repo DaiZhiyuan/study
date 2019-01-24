@@ -1,6 +1,3 @@
-- 1 概述
-- 1.1 __builtin_constant_p
-
 # 1. 概述
 
 记录Linux Kernel常用的GCC内置函数。
