@@ -1,4 +1,4 @@
-***Linux下进程的创建过程分析(\_do\_fork和do\_fork详解)***
+***Linux下进程的创建过程分析(do\_fork详解)***
 
 - 1 用户空间创建进程/线程的三种方法
 - 2 fork，vfork，clone系统调用的实现
@@ -811,7 +811,7 @@ union thread_union {
 
 ## 6.4 sched_fork流程
 
-```
+```c
 /*
  * fork()/clone()-time setup:
  */
