@@ -5,6 +5,7 @@
     - 1.2 图片大小限制
     - 1.3 图片分辨率限制
     - 1.3 JPG转换格式
+    - 1.4 图片路径
 - 2 OVMF编译方法
     - 2.1 建立EDKII编译环境
     - 2.2 安装编译依赖
@@ -12,7 +13,8 @@
     - 2.4 直接编译
     - 2.5 重新配置
     - 2.6 运行QEMU测试OVMF
-    - 2.7 OVMF其他修改
+    - 2.7 OVMF精简
+    - 2.8 OVMF增加Debug调试信息
 
 # 1 OVMF LOGO格式
 
@@ -45,6 +47,10 @@ tsinghua.bmp: PC bitmap, Windows 3.x format, 500 x 204 x 8
 2. 转换JPG到BMP
 > $> convert /root/tsinghua.jpg -alpha off -type palette -compress none  BMP3:tsinghua.bmp
 
+## 1.4 图片路径
+
+- edk2/MdeModulePkg/Logo/Logo.bmp
+
 # 2 OVMF编译方法
 
 ## 2.1 建立EDKII编译环境
@@ -64,6 +70,7 @@ tsinghua.bmp: PC bitmap, Windows 3.x format, 500 x 204 x 8
 ## 2.3 初始化编译环境和基本组件
 
 > #> source edksetup.sh BaseTools
+> #> make -C BaseTools/
 
 ```bash
 WORKSPACE: /root/edk2
@@ -88,6 +95,9 @@ make -C edk2/BaseTools
 ## 2.4 直接编译
 
 > #> git submodule update --force --init --recursive
+>
+> #> build -a X64 -p MdeModulePkg/MdeModulePkg.dsc -t GCC48 -b RELEASE
+>
 > #> build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -DSECURE_BOOT_ENABLE -t GCC48 -b RELEASE --cmd-len=65536 --hash
 
 ## 2.5 重新配置
@@ -102,134 +112,118 @@ QEMU加入下列参数：
 -drive if=pflash,format=raw,file=/usr/share/ovmf/OVMF_VARS.fd
 ```
 
-## 2.7 OVMF其他修改
+## 2.7 OVMF精简
 
-
-1. 精简菜单
-```
-diff -Nur before/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c after/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c
---- before/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c       2019-01-09 23:16:08.000000000 -0500
-+++ after/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c        2019-01-31 20:25:12.000000000 -0500
-@@ -35,15 +35,17 @@
-   IN VOID            *StartOpCodeHandle
-   )
- {
-+  // Jintide ->
+```patch
+diff --git a/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c b/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c
+index a9d2269..648a446 100644
+--- a/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c
++++ b/MdeModulePkg/Application/UiApp/FrontPageCustomizedUi.c
+@@ -38,12 +38,12 @@ UiCustomizeFrontPage (
    //
    // Create "Select Language" menu with Oneof opcode.
    //
 -  UiCreateLanguageMenu (HiiHandle, StartOpCodeHandle);
 +  // UiCreateLanguageMenu (HiiHandle, StartOpCodeHandle);
-
+ 
    //
    // Create empty line.
    //
 -  UiCreateEmptyLine(HiiHandle, StartOpCodeHandle);
 +  // UiCreateEmptyLine(HiiHandle, StartOpCodeHandle);
-+  // Jintide -<
-
+ 
    //
    // Find third party drivers which need to be shown in the front page.
-diff -Nur before/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c after/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c
---- before/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c   2019-01-09 23:16:08.000000000 -0500
-+++ after/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c    2019-01-31 20:48:58.000000000 -0500
-@@ -1110,7 +1110,9 @@
+diff --git a/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c b/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c
+index b4f4dff..1ea378e 100644
+--- a/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c
++++ b/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenance.c
+@@ -1110,7 +1110,7 @@ BootMaintCallback (
          // 1. Update the menus (including legacy munu) show in BootMiantenanceManager page.
          // 2. Re-scan the BootOption menus (including the legacy boot option).
          //
 -        CustomizeMenus ();
-+        // Jitide ->
 +        // CustomizeMenus ();
-+        // Jintide -<
          EfiBootManagerRefreshAllBootOption ();
          BOpt_GetBootOptions (Private);
          mFirstEnterBMMForm = TRUE;
-diff -Nur before/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr after/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr
---- before/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr  2019-01-09 23:16:08.000000000 -0500
-+++ after/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr   2019-01-31 21:45:56.000000000 -0500
-@@ -39,6 +39,13 @@
+diff --git a/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr b/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr
+index a14074a..81962e0 100644
+--- a/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr
++++ b/MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManager.vfr
+@@ -38,6 +38,15 @@ formset
+               flags = INTERACTIVE,
                key   = KEY_VALUE_TRIGGER_FORM_OPEN_ACTION;
         endif;
-
++       
 +       // Jintide ->
 +       goto FORM_BOOT_CHG_ID,
-+            prompt = STRING_TOKEN(STR_FORM_BOOT_CHG_TITLE),
-+            help = STRING_TOKEN(STR_FORM_BOOT_IMMEDIATE_HELP),
-+            flags = INTERACTIVE,
-+            key = FORM_BOOT_CHG_ID;
-+        // Jintide -<
++             prompt = STRING_TOKEN(STR_FORM_BOOT_CHG_TITLE),
++             help = STRING_TOKEN(STR_FORM_BOOT_IMMEDIATE_HELP),
++             flags = INTERACTIVE,
++             key = FORM_BOOT_CHG_ID;
++       // Jintide -<
++        
+ 
      label LABEL_FORM_MAIN_START;
      //
-     // This is where we will dynamically add a Action type op-code to show
-@@ -69,11 +76,13 @@
+@@ -69,11 +78,13 @@ formset
              flags = INTERACTIVE,
              key = FORM_BOOT_DEL_ID;
-
+ 
 -       goto FORM_BOOT_CHG_ID,
 -            prompt = STRING_TOKEN(STR_FORM_BOOT_CHG_TITLE),
 -            help = STRING_TOKEN(STR_FORM_BOOT_IMMEDIATE_HELP),
 -            flags = INTERACTIVE,
 -            key = FORM_BOOT_CHG_ID;
-+       // Jintide ->
-+       //goto FORM_BOOT_CHG_ID,
++       // Jintide
++       // goto FORM_BOOT_CHG_ID,
 +       //     prompt = STRING_TOKEN(STR_FORM_BOOT_CHG_TITLE),
 +       //     help = STRING_TOKEN(STR_FORM_BOOT_IMMEDIATE_HELP),
 +       //     flags = INTERACTIVE,
 +       //     key = FORM_BOOT_CHG_ID;
-+       // Jinitde -<
++
    endform;
-
+ 
    form formid = FORM_DRIVER_SETUP_ID,
-diff -Nur before/OvmfPkg/OvmfPkgX64.dsc after/OvmfPkg/OvmfPkgX64.dsc
---- before/OvmfPkg/OvmfPkgX64.dsc       2019-02-01 02:14:06.580389000 -0500
-+++ after/OvmfPkg/OvmfPkgX64.dsc        2019-02-01 01:32:02.000000000 -0500
-@@ -698,7 +698,9 @@
+diff --git a/OvmfPkg/Library/PlatformBootManagerLib/BdsPlatform.c b/OvmfPkg/Library/PlatformBootManagerLib/BdsPlatform.c
+index b2faa79..edd0e25 100644
+--- a/OvmfPkg/Library/PlatformBootManagerLib/BdsPlatform.c
++++ b/OvmfPkg/Library/PlatformBootManagerLib/BdsPlatform.c
+@@ -1669,7 +1669,7 @@ PlatformBootManagerWaitCallback (
+   BootLogoUpdateProgress (
+     White.Pixel,
+     Black.Pixel,
+-    L"Start boot option",
++    L"Starting OS",
+     White.Pixel,
+     (Timeout - TimeoutRemain) * 100 / Timeout,
+     0
+diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
+index aa3efc5..0960016 100644
+--- a/OvmfPkg/OvmfPkgX64.dsc
++++ b/OvmfPkg/OvmfPkgX64.dsc
+@@ -704,7 +704,9 @@
    MdeModulePkg/Logo/LogoDxe.inf
    MdeModulePkg/Application/UiApp/UiApp.inf {
      <LibraryClasses>
 -      NULL|MdeModulePkg/Library/DeviceManagerUiLib/DeviceManagerUiLib.inf
-+      # Jintide ->
++      # Jintide
 +      # NULL|MdeModulePkg/Library/DeviceManagerUiLib/DeviceManagerUiLib.inf
-+      # Jintide -<
++      # Jintide
        NULL|MdeModulePkg/Library/BootManagerUiLib/BootManagerUiLib.inf
        NULL|MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManagerUiLib.inf
  !ifdef $(CSM_ENABLE)
 ```
 
-2. 强制OVMF不显示QEMU DVD-ROM设备
-```
-diff -Nur before/MdeModulePkg/Library/UefiBootManagerLib/BmBoot.c after/MdeModulePkg/Library/UefiBootManager
---- before/MdeModulePkg/Library/UefiBootManagerLib/BmBoot.c     2019-02-01 18:09:04.000000000 +0800
-+++ after/MdeModulePkg/Library/UefiBootManagerLib/BmBoot.c      2019-02-01 18:08:12.000000000 +0800
-@@ -2262,6 +2262,18 @@
-         ASSERT_EFI_ERROR (Status);
-       }
-     }
-+
-+    // Jintide ->
-+    if (EfiBootManagerFindLoadOption (&NvBootOptions[Index], BootOptions, BootOptionCount) == -1) {
-+      if (StrnCmp(NvBootOptions[Index].Description, L"UEFI QEMU DVD-ROM", 17) == 0) {
-+        Status = EfiBootManagerDeleteLoadOptionVariable (NvBootOptions[Index].OptionNumber, LoadOptionTypeB
-+        //
-+        // Deleting variable with current variable implementation shouldn't fail.
-+        //
-+        ASSERT_EFI_ERROR (Status);
-+      }
-+    }
-+    // Jintide -<
-   }
+## 2.8 OVMF增加Debug调试信息
 
-   //
-@@ -2269,6 +2281,10 @@
-   //
-   for (Index = 0; Index < BootOptionCount; Index++) {
-     if (EfiBootManagerFindLoadOption (&BootOptions[Index], NvBootOptions, NvBootOptionCount) == -1) {
-+      // Jintide ->
-+      if (StrnCmp(BootOptions[Index].Description, L"UEFI QEMU DVD-ROM", 17) == 0)
-+        continue;
-+      // Jintide -<
-       EfiBootManagerAddLoadOptionVariable (&BootOptions[Index], (UINTN) -1);
-       //
-       // Try best to add the boot options so continue upon failure.
+在编译时，选择编译DEBUG模式：
 
+> #> build -a X64 -p OvmfPkg/OvmfPkgX64.dsc -DSECURE_BOOT_ENABLE -t GCC48 -b RELEASE --cmd-len=65536 --hash
+
+QEMU启动参数增加：
 ```
+  -debugcon file:/var/log/guestbios.log -global isa-debugcon.iobase=0x402 
+```
+GuestOS在启动时将OVMF的DEBUG信息输出到/var/log/guestbios.log文件中。
