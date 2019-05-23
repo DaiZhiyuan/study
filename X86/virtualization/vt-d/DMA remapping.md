@@ -112,6 +112,7 @@ Context-entry中记录的信息有：
 
 根据软件的使用模型不同，直通设备的`DMA Address Space`可能是某个VM的`Guest Physical Address Space`或`某个进程的虚拟地址空间（由分配给进程的PASID定义）`或是由`软件定义的一段抽象的IO Virtual Address space (IOVA)`，总之DMA Remapping就是要能够将**设备发起的DMA Request进行DMA Translation重映射到对应的HPA上**。下面的图描述了DMA Translation的原理，这和MMU将虚拟地址翻译成物理地址的过程非常的类似。
 
+![image](./images/0x02.png)
 
 Host平台上可能会存在一个或者多个DMA Remapping硬件单元，而每个硬件单元支持在它管理的设备范围内的所有设备的DMA Remapping。
 
