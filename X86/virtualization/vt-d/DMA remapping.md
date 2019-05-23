@@ -1,5 +1,3 @@
-
-
 # 1. DMA简介
 
 DMA传输将数据从一个地址空间（IO memory）复制到另外一个地址空间（System RAM），当CPU 初始化这个传输动作，传输动作本身是由 DMA控制器来实行和完成。其带来最大的好处是：CPU不需要干预数据传输的过程，这样就大大提高了CPU的利用率。
@@ -80,6 +78,8 @@ VT-d DMA Remapping的硬件能力主要是由IOMMU来提供，通过引入根`Co
 
 同时为了能够记录直通设备和每个Domain的关系，VT-d引入了`root-entry/context-entry`的概念，通过查询`root-entry/context-entry table`就可以获得**直通设备和Domain之间的映射关系**。
 
+![image](./images/0x04.png)
+
 ### 2.2.1 Root-table
 
 Root-table的基地址存放在Root Table Address Register当中。
@@ -112,8 +112,6 @@ Context-entry中记录的信息有：
 
 根据软件的使用模型不同，直通设备的`DMA Address Space`可能是某个VM的`Guest Physical Address Space`或`某个进程的虚拟地址空间（由分配给进程的PASID定义）`或是由`软件定义的一段抽象的IO Virtual Address space (IOVA)`，总之DMA Remapping就是要能够将**设备发起的DMA Request进行DMA Translation重映射到对应的HPA上**。下面的图描述了DMA Translation的原理，这和MMU将虚拟地址翻译成物理地址的过程非常的类似。
 
-
-![image](./images/0x04.png)
 
 Host平台上可能会存在一个或者多个DMA Remapping硬件单元，而每个硬件单元支持在它管理的设备范围内的所有设备的DMA Remapping。
 
