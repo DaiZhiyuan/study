@@ -561,7 +561,7 @@ pcm=0xa7d0000000@0x1870000000,0xa800000000@0xd840000000 mtr_init=proc pcm_sample
 ```
 
 testcase:
-```
+```bash
 [root@localhost userland]# ./gpi
 Try run "modprobe gustaware"
 
@@ -694,7 +694,7 @@ pcm=0xa7d0000000@0x1870000000,0xa800000000@0xd840000000 mtr_init=proc pcm_sample
 ```
 
 testcase:
-```
+```bash
 [root@localhost userland]# ./gpi
 Try run "modprobe gustaware"
 
