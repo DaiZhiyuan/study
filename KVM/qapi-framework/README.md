@@ -1,4 +1,19 @@
-[TOC]
+<!-- TOC -->
+
+- [How to write QMP commands using the QAPI framework](#how-to-write-qmp-commands-using-the-qapi-framework)
+    - [Overview](#overview)
+        - [Testing](#testing)
+    - [Writing a command that doesn't return data](#writing-a-command-that-doesnt-return-data)
+        - [Arguments](#arguments)
+        - [Errors](#errors)
+        - [Command Documentation](#command-documentation)
+        - [Implementing the HMP command](#implementing-the-hmp-command)
+    - [Writing a command that returns data](#writing-a-command-that-returns-data)
+        - [User Defined Types](#user-defined-types)
+            - [The HMP command](#the-hmp-command)
+        - [Returning Lists](#returning-lists)
+
+<!-- /TOC -->
 
 # How to write QMP commands using the QAPI framework 
 
