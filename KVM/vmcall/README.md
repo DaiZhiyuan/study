@@ -183,7 +183,7 @@ index cf4c4b8..17914b0 100644
 
 guest_aware.c
 
-```
+```c
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -344,8 +344,8 @@ MODULE_DESCRIPTION("Guest enhancements tools");
 MODULE_VERSION("1.0");
 ```
 
-dpi.c
-```
+gpi.c
+```c
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
