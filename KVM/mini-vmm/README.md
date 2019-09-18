@@ -307,11 +307,11 @@ To understand how the VMM works.
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-C                                1             41              7            184
+C                                1             44             10            184
 make                             1              4              0              9
 Assembly                         1              3              0              8
 -------------------------------------------------------------------------------
-SUM:                             3             48              7            201
+SUM:                             3             51             10            201
 -------------------------------------------------------------------------------
 ```
 
@@ -330,66 +330,65 @@ SUM:                             3             48              7            201
 
 ```bash
 #> ./vmm
-
 VM Starting...
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 0
+-- size: 2
 VMM simulate
 
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 1
+-- size: 2
 VMM simulate
 
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 2
+-- size: 2
 VMM simulate
 
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 3
+-- size: 2
 VMM simulate
 
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 4
+-- size: 2
 VMM simulate
 
 VMM enter guest...
 
 Handle PIO
 Hardware decode:
--- port: 16
--- direction: IN
--- count: 1
+-- port: 255
+-- direction: in
 -- data: 5
+-- size: 2
 VMM simulate
 ```
 
@@ -404,7 +403,7 @@ _start:
     xorw %ax, %ax
 
 loop:
-    out %ax, $0x10
+    out %ax, $0xFF
     inc %ax
     jmp loop
 ```
@@ -429,9 +428,13 @@ vmm.c
 #define GUEST_SYSTEM_IMAGE  "vm.bin"
 
 #define die(messages)       fprintf(stderr, "%s\n", messages),exit(errno);
+
+/*
+ * For 20-bit Addresses, selector is 4bits, base/offset is 16 bits.
+ */
 #define RESET_SEGMENT(regs) \
     do { \
-        vcpu->sregs.regs.selector = 0x1000; \
+        vcpu->sregs.regs.selector = 0; \
         vcpu->sregs.regs.base = 0x1000 << 4; \
     } while(0)
 
@@ -472,9 +475,9 @@ void vmm_reset_vcpu(struct vcpu *vcpu)
     if (ioctl(vcpu->vcpu_fd, KVM_SET_SREGS, &vcpu->sregs) < 0)
         die("Can not set segment regs.");
 
-    vcpu->regs.rflags = 0x0000000000000002ULL;
+    vcpu->regs.rflags = 0x2;
     vcpu->regs.rip = 0;
-    vcpu->regs.rsp = 0xffffffff;
+    vcpu->regs.rsp = 0;
     vcpu->regs.rbp = 0;
 
     if (ioctl(vcpu->vcpu_fd, KVM_SET_REGS, &(vcpu->regs)) < 0)
@@ -488,11 +491,11 @@ void vmm_handle_pio(struct vcpu *vcpu)
     printf("Hardware decode:\n");
     printf("-- port: %d\n", vcpu->kvm_run->io.port);
     printf("-- direction: %s\n",
-           vcpu->kvm_run->io.direction ? "IN" : "OUT");
-    printf("-- count: %d\n", vcpu->kvm_run->io.count);
+           vcpu->kvm_run->io.direction ? "in" : "out");
     printf("-- data: %d\n",
            *(int *) ((char *) (vcpu->kvm_run) +
                      vcpu->kvm_run->io.data_offset));
+    printf("-- size: %d\n", vcpu->kvm_run->io.size);
     printf("VMM simulate\n");
     sleep(1);
     printf("\n");
@@ -503,6 +506,7 @@ void *vmm_cpu_thread(void *args)
 {
     struct virtual_machine_manager *vmm =
         (struct virtual_machine_manager *) args;
+
     vmm_reset_vcpu(vmm->vcpus);
 
     int ret;
@@ -543,6 +547,7 @@ struct virtual_machine_manager *virtual_machine_manager_init(void)
         return NULL;
 
     vmm->kvm_version = ioctl(vmm->kvm_fd, KVM_GET_API_VERSION, 0);
+
     return vmm;
 }
 
@@ -556,7 +561,7 @@ int virtual_machine_manager_create_vm(struct virtual_machine_manager *vmm,
     if (vmm->vm_fd < 0)
             return -1;
 
-    // 2. Settings Virtual Machine Memory
+    // 2. Settings Virtual Machine Memory(GPA:0 ~ 256MB)
     vmm->guest_ram_size = memory_size;
     vmm->guest_ram_start =
         (__u64) mmap(NULL, vmm->guest_ram_size, PROT_READ | PROT_WRITE,
