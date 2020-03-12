@@ -227,3 +227,10 @@ bind-key h split-window -v
 # Easy config reload
 bind-key r source-file ~/.tmux.conf \; display-message "tmux.conf reloaded"
 ```
+
+## Virtual Machine Instance
+
+Kernel Command Line:
+```
+root=/dev/mapper/centos_centos7u5-root ro rd.lvm.lv=centos_centos7u5/root rd.lvm.lv=centos_centos7u5/swap rhgb quiet selinux=0 audit=0 cgroup_disable=memory,cpu,cpuacct,blkio,hugetlb elevator=deadline realloc=on nmi_watchdog=0 nosoftlockup disable_ipv6=1 clocksource=tsc tsc=reliable hpet=disable nohz=off highres=off nopti nopku spectre_v2=off spec_store_bypass_disable=off intel_idle.max_cstate=0 mce=ignore_ce
+```
