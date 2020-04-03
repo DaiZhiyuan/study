@@ -1,0 +1,3537 @@
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/dl-trampoline.S glibc-2.17-c758a686/sysdeps/aarch64/dl-trampoline.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/dl-trampoline.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/dl-trampoline.S	2020-03-03 10:22:19.253552348 +0800
+@@ -0,0 +1,296 @@
++/* Copyright (C) 2005-2013 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++#include <libc-symbols.h>
++
++#include "dl-link.h"
++
++#define ip0 x16
++#define ip1 x17
++#define lr  x30
++
++	.text
++	.globl _dl_runtime_resolve
++	.type _dl_runtime_resolve, #function
++	cfi_startproc
++	.align 2
++_dl_runtime_resolve:
++	/* AArch64 we get called with:
++	   ip0		&PLTGOT[2]
++	   ip1		temp(dl resolver entry point)
++	   [sp, #8]	lr
++	   [sp, #0]	&PLTGOT[n]
++	 */
++
++	cfi_rel_offset (lr, 8)
++
++	/* Save arguments.  */
++	stp	x8, x9, [sp, #-(80+8*16)]!
++	cfi_adjust_cfa_offset (80+8*16)
++	cfi_rel_offset (x8, 0)
++	cfi_rel_offset (x9, 8)
++
++	stp	x6, x7, [sp,  #16]
++	cfi_rel_offset (x6, 16)
++	cfi_rel_offset (x7, 24)
++
++	stp	x4, x5, [sp,  #32]
++	cfi_rel_offset (x4, 32)
++	cfi_rel_offset (x5, 40)
++
++	stp	x2, x3, [sp,  #48]
++	cfi_rel_offset (x2, 48)
++	cfi_rel_offset (x3, 56)
++
++	stp	x0, x1, [sp,  #64]
++	cfi_rel_offset (x0, 64)
++	cfi_rel_offset (x1, 72)
++
++	stp	q0, q1, [sp, #(80+0*16)]
++	cfi_rel_offset (q0, 80+0*16)
++	cfi_rel_offset (q1, 80+1*16)
++
++	stp	q2, q3, [sp, #(80+2*16)]
++	cfi_rel_offset (q0, 80+2*16)
++	cfi_rel_offset (q1, 80+3*16)
++
++	stp	q4, q5, [sp, #(80+4*16)]
++	cfi_rel_offset (q0, 80+4*16)
++	cfi_rel_offset (q1, 80+5*16)
++
++	stp	q6, q7, [sp, #(80+6*16)]
++	cfi_rel_offset (q0, 80+6*16)
++	cfi_rel_offset (q1, 80+7*16)
++
++	/* Get pointer to linker struct.  */
++	ldr	x0, [ip0, #-8]
++
++	/* Prepare to call _dl_fixup().  */
++	ldr	x1, [sp, 80+8*16]	/* Recover &PLTGOT[n] */
++
++	sub     x1, x1, ip0
++	add     x1, x1, x1, lsl #1
++	lsl     x1, x1, #3
++	sub     x1, x1, #192
++	lsr     x1, x1, #3
++
++	/* Call fixup routine.  */
++	bl	_dl_fixup
++
++	/* Save the return.  */
++	mov	ip0, x0
++
++	/* Get arguments and return address back.  */
++	ldp	q0, q1, [sp, #(80+0*16)]
++	ldp	q2, q3, [sp, #(80+2*16)]
++	ldp	q4, q5, [sp, #(80+4*16)]
++	ldp	q6, q7, [sp, #(80+6*16)]
++	ldp	x0, x1, [sp, #64]
++	ldp	x2, x3, [sp, #48]
++	ldp	x4, x5, [sp, #32]
++	ldp	x6, x7, [sp, #16]
++	ldp	x8, x9, [sp], #(80+8*16)
++	cfi_adjust_cfa_offset (-(80+8*16))
++
++	ldp	ip1, lr, [sp], #16
++	cfi_adjust_cfa_offset (-16)
++
++	/* Jump to the newly found address.  */
++	br	ip0
++
++	cfi_endproc
++	.size _dl_runtime_resolve, .-_dl_runtime_resolve
++#ifndef PROF
++	.globl _dl_runtime_profile
++	.type _dl_runtime_profile, #function
++	cfi_startproc
++	.align 2
++_dl_runtime_profile:
++	/* AArch64 we get called with:
++	   ip0		&PLTGOT[2]
++	   ip1		temp(dl resolver entry point)
++	   [sp, #8]	lr
++	   [sp, #0]	&PLTGOT[n]
++
++	   Stack frame layout:
++	   [sp,   #...] lr
++	   [sp,   #...] &PLTGOT[n]
++	   [sp,    #96] La_aarch64_regs
++	   [sp,    #48] La_aarch64_retval
++	   [sp,    #40] frame size return from pltenter
++	   [sp,    #32] dl_profile_call saved x1
++	   [sp,    #24] dl_profile_call saved x0
++	   [sp,    #16] t1
++	   [sp,     #0] x29, lr   <- x29
++	 */
++
++# define OFFSET_T1		16
++# define OFFSET_SAVED_CALL_X0	OFFSET_T1 + 8
++# define OFFSET_FS		OFFSET_SAVED_CALL_X0 + 16
++# define OFFSET_RV		OFFSET_FS + 8
++# define OFFSET_RG		OFFSET_RV + DL_SIZEOF_RV
++
++# define SF_SIZE		OFFSET_RG + DL_SIZEOF_RG
++
++# define OFFSET_PLTGOTN		SF_SIZE
++# define OFFSET_LR		OFFSET_PLTGOTN + 8
++
++	/* Save arguments.  */
++	sub	sp, sp, #SF_SIZE
++	cfi_adjust_cfa_offset (SF_SIZE)
++	stp	x29, x30, [SP, #0]
++	mov	x29, sp
++	cfi_def_cfa_register (x29)
++	cfi_rel_offset (x29, 0)
++	cfi_rel_offset (lr, 8)
++
++	stp	x0, x1, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*0]
++	cfi_rel_offset (x0, OFFSET_RG + DL_OFFSET_RG_X0 + 16*0 + 0)
++	cfi_rel_offset (x1, OFFSET_RG + DL_OFFSET_RG_X0 + 16*0 + 8)
++	stp	x2, x3, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*1]
++	cfi_rel_offset (x2, OFFSET_RG + DL_OFFSET_RG_X0 + 16*1 + 0)
++	cfi_rel_offset (x3, OFFSET_RG + DL_OFFSET_RG_X0 + 16*1 + 8)
++	stp	x4, x5, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*2]
++	cfi_rel_offset (x4, OFFSET_RG + DL_OFFSET_RG_X0 + 16*2 + 0)
++	cfi_rel_offset (x5, OFFSET_RG + DL_OFFSET_RG_X0 + 16*2 + 8)
++	stp	x6, x7, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*3]
++	cfi_rel_offset (x6, OFFSET_RG + DL_OFFSET_RG_X0 + 16*3 + 0)
++	cfi_rel_offset (x7, OFFSET_RG + DL_OFFSET_RG_X0 + 16*3 + 8)
++
++	stp	d0, d1, [X29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*0]
++	cfi_rel_offset (d0, OFFSET_RG + DL_OFFSET_RG_D0 + 16*0)
++	cfi_rel_offset (d1, OFFSET_RG + DL_OFFSET_RG_D0 + 16*0 + 8)
++	stp	d2, d3, [X29, #OFFSET_RG+ DL_OFFSET_RG_D0 + 16*1]
++	cfi_rel_offset (d2, OFFSET_RG + DL_OFFSET_RG_D0 + 16*1 + 0)
++	cfi_rel_offset (d3, OFFSET_RG + DL_OFFSET_RG_D0 + 16*1 + 8)
++	stp	d4, d5, [X29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*2]
++	cfi_rel_offset (d4, OFFSET_RG + DL_OFFSET_RG_D0 + 16*2 + 0)
++	cfi_rel_offset (d5, OFFSET_RG + DL_OFFSET_RG_D0 + 16*2 + 8)
++	stp	d6, d7, [X29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*3]
++	cfi_rel_offset (d6, OFFSET_RG + DL_OFFSET_RG_D0 + 16*3 + 0)
++	cfi_rel_offset (d7, OFFSET_RG + DL_OFFSET_RG_D0 + 16*3 + 8)
++
++	add     x0, x29, #SF_SIZE + 16
++	ldr	x1, [x29, #OFFSET_LR]
++	stp	x0, x1, [x29, #OFFSET_RG + DL_OFFSET_RG_SP]
++
++	/* Get pointer to linker struct.  */
++	ldr	x0, [ip0, #-8]
++
++	/* Prepare to call _dl_profile_fixup().  */
++	ldr	x1, [x29, OFFSET_PLTGOTN]	/* Recover &PLTGOT[n] */
++
++	sub     x1, x1, ip0
++	add     x1, x1, x1, lsl #1
++	lsl     x1, x1, #3
++	sub     x1, x1, #192
++	lsr     x1, x1, #3
++
++	stp	x0, x1, [x29, #OFFSET_SAVED_CALL_X0]
++
++	/* Set up extra args for _dl_profile_fixup */
++	ldr	x2, [x29, #OFFSET_LR]		/* load saved LR */
++	add	x3, x29, #OFFSET_RG		/* address of La_aarch64_reg */
++	add	x4, x29, #OFFSET_FS		/* address of framesize */
++	bl	_dl_profile_fixup
++
++	ldr	ip0, [x29, #OFFSET_FS]		/* framesize == 0 */
++	cmp	ip0, #0
++	bge	1f
++	cfi_remember_state
++
++	/* Save the return.  */
++	mov	ip0, x0
++
++	/* Get arguments and return address back.  */
++	ldp	x0, x1, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*0]
++	ldp	x2, x3, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*1]
++	ldp	x4, x5, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*2]
++	ldp	x6, x7, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*3]
++	ldp	d0, d1, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*0]
++	ldp	d2, d3, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*1]
++	ldp	d4, d5, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*2]
++	ldp	d6, d7, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*3]
++
++	cfi_def_cfa_register (sp)
++	ldp	x29, x30, [x29, #0]
++	cfi_restore(x29)
++	cfi_restore(x30)
++
++	add	sp, sp, SF_SIZE + 16
++	cfi_adjust_cfa_offset (- SF_SIZE - 16)
++
++	/* Jump to the newly found address.  */
++	br	ip0
++
++	cfi_restore_state
++1:
++	/* The new frame size is in ip0.  */
++
++	sub	x1, x29, ip0
++	and	sp, x1, #0xfffffffffffffff0
++
++	str	x0, [x29, #OFFSET_T1]
++
++	mov	x0, sp
++	add	x1, x29, #SF_SIZE + 16
++	mov	x2, ip0
++	bl	memcpy
++
++	ldr	ip0, [x29, #OFFSET_T1]
++
++	/* Call the function.  */
++	ldp	x0, x1, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*0]
++	ldp	x2, x3, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*1]
++	ldp	x4, x5, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*2]
++	ldp	x6, x7, [x29, #OFFSET_RG + DL_OFFSET_RG_X0 + 16*3]
++	ldp	d0, d1, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*0]
++	ldp	d2, d3, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*1]
++	ldp	d4, d5, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*2]
++	ldp	d6, d7, [x29, #OFFSET_RG + DL_OFFSET_RG_D0 + 16*3]
++	blr	ip0
++	stp	x0, x1, [x29, #OFFSET_RV + DL_OFFSET_RV_X0]
++	stp	d0, d1, [x29, #OFFSET_RV + DL_OFFSET_RV_D0 + 16*0]
++	stp	d2, d3, [x29, #OFFSET_RV + DL_OFFSET_RV_D0 + 16*1]
++
++	/* Setup call to pltexit  */
++	ldp	x0, x1, [x29, #OFFSET_SAVED_CALL_X0]
++	add	x2, x29, #OFFSET_RG
++	add	x3, x29, #OFFSET_RV
++	bl	_dl_call_pltexit
++
++	ldp	x0, x1, [x29, #OFFSET_RV + DL_OFFSET_RV_X0]
++	ldp	d0, d1, [x29, #OFFSET_RV + DL_OFFSET_RV_D0 + 16*0]
++	ldp	d2, d3, [x29, #OFFSET_RV + DL_OFFSET_RV_D0 + 16*1]
++	/* LR from within La_aarch64_reg */
++	ldr	lr, [x29, #OFFSET_RG + DL_OFFSET_RG_LR]
++	cfi_restore(lr)
++	mov	sp, x29
++	cfi_def_cfa_register (sp)
++	ldr	x29, [x29, #0]
++	cfi_restore(x29)
++	add	sp, sp, SF_SIZE + 16
++	cfi_adjust_cfa_offset (- SF_SIZE - 16)
++
++	br	lr
++
++	cfi_endproc
++	.size _dl_runtime_profile, .-_dl_runtime_profile
++#endif
++	.previous
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memchr.S glibc-2.17-c758a686/sysdeps/aarch64/memchr.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memchr.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memchr.S	2020-03-03 10:22:19.253552348 +0800
+@@ -0,0 +1,157 @@
++/* memchr - find a character in a memory zone
++
++   Copyright (C) 2015-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ * Neon Available.
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define chrin		w1
++#define cntin		x2
++
++#define result		x0
++
++#define src		x3
++#define	tmp		x4
++#define wtmp2		w5
++#define synd		x6
++#define soff		x9
++#define cntrem		x10
++
++#define vrepchr		v0
++#define vdata1		v1
++#define vdata2		v2
++#define vhas_chr1	v3
++#define vhas_chr2	v4
++#define vrepmask	v5
++#define vend		v6
++
++/*
++ * Core algorithm:
++ *
++ * For each 32-byte chunk we calculate a 64-bit syndrome value, with two bits
++ * per byte. For each tuple, bit 0 is set if the relevant byte matched the
++ * requested character and bit 1 is not used (faster than using a 32bit
++ * syndrome). Since the bits in the syndrome reflect exactly the order in which
++ * things occur in the original string, counting trailing zeros allows to
++ * identify exactly which byte has matched.
++ */
++
++ENTRY (__memchr)
++	/* Do not dereference srcin if no bytes to compare.  */
++	cbz	cntin, L(zero_length)
++	/*
++	 * Magic constant 0x40100401 allows us to identify which lane matches
++	 * the requested byte.
++	 */
++	mov	wtmp2, #0x0401
++	movk	wtmp2, #0x4010, lsl #16
++	dup	vrepchr.16b, chrin
++	/* Work with aligned 32-byte chunks */
++	bic	src, srcin, #31
++	dup	vrepmask.4s, wtmp2
++	ands	soff, srcin, #31
++	and	cntrem, cntin, #31
++	b.eq	L(loop)
++
++	/*
++	 * Input string is not 32-byte aligned. We calculate the syndrome
++	 * value for the aligned 32 bytes block containing the first bytes
++	 * and mask the irrelevant part.
++	 */
++
++	ld1	{vdata1.16b, vdata2.16b}, [src], #32
++	sub	tmp, soff, #32
++	adds	cntin, cntin, tmp
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
++	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
++	mov	synd, vend.2d[0]
++	/* Clear the soff*2 lower bits */
++	lsl	tmp, soff, #1
++	lsr	synd, synd, tmp
++	lsl	synd, synd, tmp
++	/* The first block can also be the last */
++	b.ls	L(masklast)
++	/* Have we found something already? */
++	cbnz	synd, L(tail)
++
++L(loop):
++	ld1	{vdata1.16b, vdata2.16b}, [src], #32
++	subs	cntin, cntin, #32
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* If we're out of data we finish regardless of the result */
++	b.ls	L(end)
++	/* Use a fast check for the termination condition */
++	orr	vend.16b, vhas_chr1.16b, vhas_chr2.16b
++	addp	vend.2d, vend.2d, vend.2d
++	mov	synd, vend.2d[0]
++	/* We're not out of data, loop if we haven't found the character */
++	cbz	synd, L(loop)
++
++L(end):
++	/* Termination condition found, let's calculate the syndrome value */
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
++	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
++	mov	synd, vend.2d[0]
++	/* Only do the clear for the last possible block */
++	b.hi	L(tail)
++
++L(masklast):
++	/* Clear the (32 - ((cntrem + soff) % 32)) * 2 upper bits */
++	add	tmp, cntrem, soff
++	and	tmp, tmp, #31
++	sub	tmp, tmp, #32
++	neg	tmp, tmp, lsl #1
++	lsl	synd, synd, tmp
++	lsr	synd, synd, tmp
++
++L(tail):
++	/* Count the trailing zeros using bit reversing */
++	rbit	synd, synd
++	/* Compensate the last post-increment */
++	sub	src, src, #32
++	/* Check that we have found a character */
++	cmp	synd, #0
++	/* And count the leading zeros */
++	clz	synd, synd
++	/* Compute the potential result */
++	add	result, src, synd, lsr #1
++	/* Select result or NULL */
++	csel	result, xzr, result, eq
++	ret
++
++L(zero_length):
++	mov	result, #0
++	ret
++END (__memchr)
++weak_alias (__memchr, memchr)
++libc_hidden_builtin_def (memchr)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memcmp.S glibc-2.17-c758a686/sysdeps/aarch64/memcmp.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memcmp.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memcmp.S	2020-03-03 10:22:19.253552348 +0800
+@@ -0,0 +1,180 @@
++/* memcmp - compare memory
++
++   Copyright (C) 2013-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64, unaligned accesses.
++ */
++
++/* Parameters and result.  */
++#define src1		x0
++#define src2		x1
++#define limit		x2
++#define result		w0
++
++/* Internal variables.  */
++#define data1		x3
++#define data1w		w3
++#define data1h		x4
++#define data2		x5
++#define data2w		w5
++#define data2h		x6
++#define tmp1		x7
++
++ENTRY_ALIGN (memcmp, 6)
++	DELOUSE (0)
++	DELOUSE (1)
++	DELOUSE (2)
++
++	subs	limit, limit, 16
++	b.lo	L(less16)		
++	
++	ldp	data1, data1h, [src1], 16
++	ldp	data2, data2h, [src2], 16
++	ccmp	data1, data2, 0, ne
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++
++	subs    limit, limit, 16
++	b.ls    L(last_bytes)
++	cmp     limit, 112
++	b.lo    L(loop16)
++
++	and	tmp1, src1, 15
++	add	limit, limit, tmp1
++	sub	src1, src1, tmp1
++	sub	src2, src2, tmp1
++	subs 	limit, limit, 48
++	
++	.p2align 4
++L(loop64):
++	ldp	data1, data1h, [src1]
++	ldp	data2, data2h, [src2]
++	cmp     data1, data2
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++	
++	ldp	data1, data1h, [src1,16]
++	ldp	data2, data2h, [src2,16]
++	cmp     data1, data2
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++ 
++	ldp	data1, data1h, [src1,32]
++	ldp	data2, data2h, [src2,32]
++	cmp     data1, data2
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++
++	ldp	data1, data1h, [src1,48]
++	ldp	data2, data2h, [src2,48]
++	cmp     data1, data2
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++
++	subs    limit, limit, 64
++	add	src1, src1, 64
++	add	src2, src2, 64
++	b.pl    L(loop64)
++	adds    limit, limit, 48
++	b.lo	L(last_bytes)  
++	
++L(loop16):
++	ldp     data1, data1h, [src1], 16
++	ldp     data2, data2h, [src2], 16
++	cmp     data1, data2
++	ccmp	data1h, data2h, 0, eq
++	b.ne	L(return64)
++	
++	subs    limit, limit, 16
++	b.hi    L(loop16)
++	/* Compare last 1-16 bytes using unaligned access.  */
++L(last_bytes):
++	add	src1, src1, limit
++	add	src2, src2, limit
++	ldp	data1, data1h, [src1]
++	ldp	data2, data2h, [src2]
++
++	/* Compare data bytes and set return value to 0, -1 or 1.  */
++L(return64):
++    	cmp	data1, data2
++	bne	L(return)
++L(return_pre):
++	mov	data1, data1h
++	mov	data2, data2h
++L(return):
++#ifndef __AARCH64EB__
++	rev	data1, data1
++	rev	data2, data2
++#endif
++	cmp     data1, data2
++L(ret_eq):
++	cset	result, ne   
++	cneg	result, result, lo
++	ret
++
++	.p2align 4
++L(less16):
++	adds	limit, limit, 8
++	b.lo	L(less8)		//lo:<
++	ldr	data1, [src1]
++	ldr	data2, [src2]
++	/* equal 8 optimized */
++    ccmp    data1, data2, 0, ne
++	b.ne	L(return)
++
++	ldr     data1, [src1, limit]
++	ldr	data2, [src2, limit]
++	b	L(return)
++
++	.p2align 4
++L(less8):
++	adds	limit, limit, 4
++	b.lo	L(less4)
++	ldr	data1w, [src1]
++	ldr	data2w, [src2]
++	ccmp    data1, data2, 0, ne
++	b.ne	L(return)
++	ldr     data1w,	[src1, limit]
++	ldr     data2w,	[src2, limit]
++	b	L(return)
++	.p2align 4	
++L(less4):
++	adds	limit, limit, 4
++	beq	L(ret_0)
++
++L(byte_loop):
++	ldrb	data1w, [src1], 1
++	ldrb	data2w, [src2], 1
++	subs	limit, limit, 1
++	ccmp	data1w, data2w, 0, ne	/* NZCV = 0b0000.  */
++	b.eq	L(byte_loop)
++	sub	result, data1w, data2w
++	ret
++L(ret_0):
++    	mov     result, 0
++    	ret
++
++END (memcmp)
++#undef bcmp
++weak_alias (memcmp, bcmp)
++libc_hidden_builtin_def (memcmp)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memcpy.S glibc-2.17-c758a686/sysdeps/aarch64/memcpy.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memcpy.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memcpy.S	2020-03-03 10:22:19.253552348 +0800
+@@ -0,0 +1,565 @@
++/* Copyright (C) 2012-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64, unaligned accesses.
++ *
++ */
++
++#define dstin	x0
++#define src	x1
++#define count	x2
++#define dst	x3
++#define srcend	x4
++#define dstend	x5
++#define tmp2	x6
++#define tmp3	x7
++#define tmp3w   w7
++#define A_l	x6
++#define A_lw	w6
++#define A_h	x7
++#define A_hw	w7
++#define B_l	x8
++#define B_lw	w8
++#define B_h	x9
++#define C_l	x10
++#define C_h	x11
++#define D_l	x12
++#define D_h	x13
++#define E_l	src
++#define E_h	count
++#define F_l	srcend
++#define F_h	dst
++#define G_l	count
++#define G_h	dst
++#define tmp1	x14
++
++#define A_q	q0
++#define B_q	q1
++#define C_q	q2
++#define D_q	q3
++#define E_q	q4
++#define F_q	q5
++#define G_q	q6
++#define H_q	q7
++#define I_q	q16
++#define J_q	q17
++
++#define A_v	v0
++#define B_v	v1
++#define C_v	v2
++#define D_v	v3
++#define E_v	v4
++#define F_v	v5
++#define G_v	v6
++#define H_v	v7
++#define I_v	v16
++#define J_v	v17
++
++#ifndef MEMMOVE
++# define MEMMOVE memmove
++#endif
++#ifndef MEMCPY
++# define MEMCPY memcpy
++#endif
++
++/* Overlapping large forward memmoves use a loop that copies backwards.
++   Otherwise memcpy is used. Small moves branch to memcopy16 directly.
++   The longer memcpy cases fall through to the memcpy head.
++*/
++
++ENTRY_ALIGN (MEMMOVE, 6)
++
++	DELOUSE (0)
++	DELOUSE (1)
++	DELOUSE (2)
++
++	sub	tmp1, dstin, src 
++	cmp	count, 512 
++	ccmp	tmp1, count, 2, hi 
++	b.lo	L(move_long)
++	cmp	count, 96 
++	ccmp	tmp1, count, 2, hi 
++	b.lo	L(move_middle)		
++
++END (MEMMOVE)
++libc_hidden_builtin_def (MEMMOVE)
++
++
++/* Copies are split into 3 main cases: small copies of up to 16 bytes,
++   medium copies of 17..96 bytes which are fully unrolled. Large copies
++   of more than 96 bytes align the destination and use load-and-merge
++   approach in the case src and dst addresses are unaligned not evenly,
++   so that, actual loads and stores are always aligned.
++   Large copies use the loops processing 64 bytes per iteration for
++   unaligned case and 128 bytes per iteration for aligned ones.
++*/
++
++#define MEMCPY_PREFETCH_LDR 640
++
++	.p2align 4
++ENTRY (MEMCPY)
++
++	DELOUSE (0)
++	DELOUSE (1)
++	DELOUSE (2)
++
++	add	srcend, src, count
++	cmp	count, 16
++	b.ls	L(memcopy16)
++	add	dstend, dstin, count
++	cmp	count, 96
++	b.hi	L(memcopy_long)
++
++	/* Medium copies: 17..96 bytes.  */
++    ldr	A_q, [src], #16
++    and	tmp1, src, 15
++	ldr	E_q, [srcend, -16]
++	cmp	count, 64
++	b.gt	L(memcpy_copy96)
++	cmp	count, 48
++	b.le	L(bytes_17_to_48)
++	/* 49..64 bytes */
++	ldp	B_q, C_q, [src]
++	str	E_q, [dstend, -16]
++	stp	A_q, B_q, [dstin]
++	str	C_q, [dstin, 32]
++	ret
++
++L(bytes_17_to_48):
++	/* 17..48 bytes*/
++	cmp	count, 32
++	b.gt	L(bytes_32_to_48)
++	/* 17..32 bytes*/
++	str	A_q, [dstin]
++	str	E_q, [dstend, -16]
++	ret
++
++L(bytes_32_to_48):
++	/* 32..48 */
++	ldr	B_q, [src]
++	str	A_q, [dstin]
++	str	E_q, [dstend, -16]
++	str	B_q, [dstin, 16]
++	ret
++
++	.p2align 4
++	/* Small copies: 0..16 bytes.  */
++L(memcopy16):
++	cmp	count, 8
++	b.lo	L(bytes_0_to_8)
++	ldr	A_l, [src]
++	ldr	A_h, [srcend, -8]
++	add	dstend, dstin, count
++	str	A_l, [dstin]
++	str	A_h, [dstend, -8]
++	ret
++	.p2align 4
++
++L(bytes_0_to_8):
++	tbz	count, 2, L(bytes_0_to_3)
++	ldr	A_lw, [src]
++	ldr	A_hw, [srcend, -4]
++	add	dstend, dstin, count
++	str	A_lw, [dstin]
++	str	A_hw, [dstend, -4]
++	ret
++
++	/* Copy 0..3 bytes.  Use a branchless sequence that copies the same
++	   byte 3 times if count==1, or the 2nd byte twice if count==2.  */
++L(bytes_0_to_3):
++	cbz	count, 1f
++	lsr	tmp1, count, 1
++	ldrb	A_lw, [src]
++	ldrb	A_hw, [srcend, -1]
++	add	dstend, dstin, count
++	ldrb	B_lw, [src, tmp1]
++	strb	B_lw, [dstin, tmp1]
++	strb	A_hw, [dstend, -1]
++	strb	A_lw, [dstin]
++1:
++	ret
++
++	.p2align 4
++
++L(memcpy_copy96):
++	/* Copying 65..96 bytes. A_q (first 16 bytes) and
++	   E_q(last 16 bytes) are already loaded. The size
++	   is large enough to benefit from aligned loads */
++	bic	src, src, 15
++	ldp	B_q, C_q, [src]
++	/* Loaded 64 bytes, second 16-bytes chunk can be
++	   overlapping with the first chunk by tmp1 bytes.
++	   Stored 16 bytes. */
++	sub	dst, dstin, tmp1
++	add	count, count, tmp1
++	/* The range of count being [65..96] becomes [65..111]
++	   after tmp [0..15] gets added to it,
++	   count now is <bytes-left-to-load>+48 */
++	cmp	count, 80
++	b.gt	L(copy96_medium)
++	ldr	D_q, [src, 32]
++	stp	B_q, C_q, [dst, 16]
++	str	D_q, [dst, 48]
++	str	A_q, [dstin]
++	str	E_q, [dstend, -16]
++	ret
++
++	.p2align 4
++L(copy96_medium):
++	ldp	D_q, G_q, [src, 32]
++	cmp	count, 96
++	b.gt	L(copy96_large)
++	stp	B_q, C_q, [dst, 16]
++	stp	D_q, G_q, [dst, 48]
++	str	A_q, [dstin]
++	str	E_q, [dstend, -16]
++	ret
++
++L(copy96_large):
++	ldr	F_q, [src, 64]
++	str	B_q, [dst, 16]
++	stp	C_q, D_q, [dst, 32]
++	stp	G_q, F_q, [dst, 64]
++	str	A_q, [dstin]
++	str	E_q, [dstend, -16]
++	ret
++
++	.p2align 4
++L(memcopy_long):
++    cmp count, 2048
++    b.ls L(copy2048_large)
++    ldr	A_q, [src], #16
++    and	tmp1, src, 15
++	bic	src, src, 15
++	ldp	B_q, C_q, [src], #32
++	sub	dst, dstin, tmp1
++	add	count, count, tmp1
++	add	dst, dst, 16
++	and	tmp1, dst, 15
++	ldp	D_q, E_q, [src], #32
++	str	A_q, [dstin]
++
++	/* Already loaded 64+16 bytes. Check if at
++	   least 64 more bytes left */
++	subs	count, count, 64+64+16
++	b.lt	L(loop128_exit0)
++	cmp	count, MEMCPY_PREFETCH_LDR + 64 + 32
++	b.lt	L(loop128)
++	cbnz	tmp1, L(dst_unaligned)
++	sub	count, count, MEMCPY_PREFETCH_LDR + 64 + 32
++
++	.p2align 4
++
++L(loop128_prefetch):
++	prfm	pldl1strm, [src, MEMCPY_PREFETCH_LDR]
++	ldp	F_q, G_q, [src], #32
++	stp	B_q, C_q, [dst], #32
++	ldp	H_q, I_q, [src], #32
++	prfm	pldl1strm, [src, MEMCPY_PREFETCH_LDR]
++	ldp	B_q, C_q, [src], #32
++	stp	D_q, E_q, [dst], #32
++	ldp	D_q, E_q, [src], #32
++	stp	F_q, G_q, [dst], #32
++	stp	H_q, I_q, [dst], #32
++	subs	count, count, 128
++	b.ge	L(loop128_prefetch)
++
++	add	count, count, MEMCPY_PREFETCH_LDR + 64 + 32
++	.p2align 4
++L(loop128):
++	ldp	F_q, G_q, [src], #32
++	ldp	H_q, I_q, [src], #32
++	stp	B_q, C_q, [dst], #32
++	stp	D_q, E_q, [dst], #32
++	subs	count, count, 64
++	b.lt	L(loop128_exit1)
++	ldp	B_q, C_q, [src], #32
++	ldp	D_q, E_q, [src], #32
++	stp	F_q, G_q, [dst], #32
++	stp	H_q, I_q, [dst], #32
++	subs	count, count, 64
++	b.ge	L(loop128)
++L(loop128_exit0):
++	ldp	F_q, G_q, [srcend, -64]
++	ldp	H_q, I_q, [srcend, -32]
++	stp	B_q, C_q, [dst], #32
++	stp	D_q, E_q, [dst]
++	stp	F_q, G_q, [dstend, -64]
++	stp	H_q, I_q, [dstend, -32]
++	ret
++L(loop128_exit1):
++	ldp	B_q, C_q, [srcend, -64]
++	ldp	D_q, E_q, [srcend, -32]
++	stp	F_q, G_q, [dst], #32
++	stp	H_q, I_q, [dst]
++	stp	B_q, C_q, [dstend, -64]
++	stp	D_q, E_q, [dstend, -32]
++	ret
++
++L(copy2048_large):
++	and	tmp1, dstin, 15
++	bic	dst, dstin, 15
++	ldp	D_l, D_h, [src]
++	sub	src, src, tmp1
++	add	count, count, tmp1	/* Count is now 16 too large.  */
++	ldp	A_l, A_h, [src, 16]
++	stp	D_l, D_h, [dstin]
++	ldp	B_l, B_h, [src, 32]
++	ldp	C_l, C_h, [src, 48]
++	ldp	D_l, D_h, [src, 64]!
++	subs	count, count, 128 + 16	/* Test and readjust count.  */
++	b.ls	L(last64)
++    
++L(loop64):
++	stp	A_l, A_h, [dst, 16]
++	ldp	A_l, A_h, [src, 16]
++	stp	B_l, B_h, [dst, 32]
++	ldp	B_l, B_h, [src, 32]
++	stp	C_l, C_h, [dst, 48]
++	ldp	C_l, C_h, [src, 48]
++	stp	D_l, D_h, [dst, 64]
++	ldp	D_l, D_h, [src, 64]
++    add dst, dst, 64
++    add src, src, 64
++	subs	count, count, 64
++	b.hi	L(loop64)
++
++	/* Write the last full set of 64 bytes.  The remainder is at most 64
++	   bytes, so it is safe to always copy 64 bytes from the end even if
++	   there is just 1 byte left.  */
++L(last64):
++	ldp	E_l, E_h, [srcend, -64]
++	stp	A_l, A_h, [dst, 16]
++	ldp	A_l, A_h, [srcend, -48]
++	stp	B_l, B_h, [dst, 32]
++	ldp	B_l, B_h, [srcend, -32]
++	stp	C_l, C_h, [dst, 48]
++	ldp	C_l, C_h, [srcend, -16]
++	stp	D_l, D_h, [dst, 64]
++	stp	E_l, E_h, [dstend, -64]
++	stp	A_l, A_h, [dstend, -48]
++	stp	B_l, B_h, [dstend, -32]
++	stp	C_l, C_h, [dstend, -16]
++	ret
++
++
++L(dst_unaligned_tail):
++	ldp	C_q, D_q, [srcend, -64]
++	ldp	E_q, F_q, [srcend, -32]
++	stp	A_q, B_q, [dst], #32
++	stp	H_q, I_q, [dst], #16
++	str	G_q, [dst, tmp1]
++	stp	C_q, D_q, [dstend, -64]
++	stp	E_q, F_q, [dstend, -32]
++	ret
++
++L(dst_unaligned):
++	/* For the unaligned store case the code loads two
++	   aligned chunks and then merges them using ext
++	   instruction. This can be up to 30% faster than
++	   the the simple unaligned store access.
++
++	   Current state: tmp1 = dst % 16; C_q, D_q, E_q
++	   contains data yet to be stored. src and dst points
++	   to next-to-be-processed data. A_q, B_q contains
++	   data already stored before, count = bytes left to
++	   be load decremented by 64.
++
++	   The control is passed here if at least 64 bytes left
++	   to be loaded. The code does two aligned loads and then
++	   extracts (16-tmp1) bytes from the first register and
++	   tmp1 bytes from the next register forming the value
++	   for the aligned store.
++
++	   As ext instruction can only have it's index encoded
++	   as immediate. 15 code chunks process each possible
++	   index value. Computed goto is used to reach the
++	   required code. */
++
++	/* Store the 16 bytes to dst and align dst for further
++	   operations, several bytes will be stored at this
++	   address once more */
++
++	ldp	F_q, G_q, [src], #32
++	stp	B_q, C_q, [dst], #32
++	bic	dst, dst, 15
++	sub	count, count, 32
++	adrp	tmp2, L(ext_table)
++	add	tmp2, tmp2, :lo12:L(ext_table)
++	add	tmp2, tmp2, tmp1, LSL #2
++	ldr	tmp3w, [tmp2]
++	add	tmp2, tmp2, tmp3w, SXTW
++	br	tmp2
++
++.p2align 4
++	/* to make the loop in each chunk 16-bytes aligned */
++	nop
++#define EXT_CHUNK(shft) \
++L(ext_size_ ## shft):;\
++	ext     A_v.16b, C_v.16b, D_v.16b, 16-shft;\
++	ext     B_v.16b, D_v.16b, E_v.16b, 16-shft;\
++	ext     H_v.16b, E_v.16b, F_v.16b, 16-shft;\
++1:;\
++	stp     A_q, B_q, [dst], #32;\
++	prfm    pldl1strm, [src, MEMCPY_PREFETCH_LDR];\
++	ldp     C_q, D_q, [src], #32;\
++	ext     I_v.16b, F_v.16b, G_v.16b, 16-shft;\
++	stp     H_q, I_q, [dst], #32;\
++	ext     A_v.16b, G_v.16b, C_v.16b, 16-shft;\
++	ext     B_v.16b, C_v.16b, D_v.16b, 16-shft;\
++	ldp     F_q, G_q, [src], #32;\
++	ext     H_v.16b, D_v.16b, F_v.16b, 16-shft;\
++	subs    count, count, 64;\
++	b.ge    1b;\
++2:;\
++	ext     I_v.16b, F_v.16b, G_v.16b, 16-shft;\
++	b	L(dst_unaligned_tail);
++
++EXT_CHUNK(1)
++EXT_CHUNK(2)
++EXT_CHUNK(3)
++EXT_CHUNK(4)
++EXT_CHUNK(5)
++EXT_CHUNK(6)
++EXT_CHUNK(7)
++EXT_CHUNK(8)
++EXT_CHUNK(9)
++EXT_CHUNK(10)
++EXT_CHUNK(11)
++EXT_CHUNK(12)
++EXT_CHUNK(13)
++EXT_CHUNK(14)
++EXT_CHUNK(15)
++
++.p2align 4
++L(move_long):
++1:
++	add	srcend, src, count
++	add	dstend, dstin, count
++
++	and	tmp1, dstend, 15
++	ldr	D_q, [srcend, -16]
++	sub	srcend, srcend, tmp1
++	sub	count, count, tmp1
++	ldp	A_q, B_q, [srcend, -32]
++	str	D_q, [dstend, -16]
++	ldp	C_q, D_q, [srcend, -64]!
++	sub	dstend, dstend, tmp1
++	subs	count, count, 128
++	b.ls	2f
++
++.p2align 4
++1:
++	subs	count, count, 64
++	stp	A_q, B_q, [dstend, -32]
++	ldp	A_q, B_q, [srcend, -32]
++	stp	C_q, D_q, [dstend, -64]!
++	ldp	C_q, D_q, [srcend, -64]!
++	b.hi	1b
++
++	/* Write the last full set of 64 bytes.  The remainder is at most 64
++	   bytes, so it is safe to always copy 64 bytes from the start even if
++	   there is just 1 byte left.  */
++2:
++	ldp	E_q, F_q, [src, 32]
++	ldp	G_q, H_q, [src]
++	stp	A_q, B_q, [dstend, -32]
++	stp	C_q, D_q, [dstend, -64]
++	stp	E_q, F_q, [dstin, 32]
++	stp	G_q, H_q, [dstin]
++3:	ret
++
++
++.p2align 4
++L(move_middle):
++	cbz	tmp1, 3f
++	add	srcend, src, count
++	prfm	PLDL1STRM, [srcend, -64]
++	add	dstend, dstin, count
++	and	tmp1, dstend, 15
++	ldr D_q, [srcend, -16]
++	sub	srcend, srcend, tmp1
++	sub	count, count, tmp1
++	ldr	A_q, [srcend, -16]
++	str	D_q, [dstend, -16]
++	ldr	B_q, [srcend, -32]
++	ldr	C_q, [srcend, -48]
++	ldr	D_q, [srcend, -64]!
++	sub	dstend, dstend, tmp1
++	subs	count, count, 128
++	b.ls	2f
++
++1:
++	str	A_q, [dstend, -16]
++	ldr	A_q, [srcend, -16]
++	str	B_q, [dstend, -32]
++	ldr	B_q, [srcend, -32]
++	str	C_q, [dstend, -48]
++	ldr	C_q, [srcend, -48]
++	str	D_q, [dstend, -64]!
++	ldr	D_q, [srcend, -64]!
++	subs	count, count, 64
++	b.hi	1b
++
++	/* Write the last full set of 64 bytes.  The remainder is at most 64
++	   bytes, so it is safe to always copy 64 bytes from the start even if
++	   there is just 1 byte left.  */
++2:
++	ldr	G_q, [src, 48]
++	str	A_q, [dstend, -16]
++	ldr	A_q, [src, 32]
++	str	B_q, [dstend, -32]
++	ldr	B_q, [src, 16]
++	str	C_q, [dstend, -48]
++	ldr	C_q, [src]
++	str	D_q, [dstend, -64]
++	str	G_q, [dstin, 48]
++	str	A_q, [dstin, 32]
++	str	B_q, [dstin, 16]
++	str	C_q, [dstin]
++3:	ret
++
++
++END (MEMCPY)
++	.section	.rodata
++	.p2align	4
++
++L(ext_table):
++	/* The first entry is for the alignment of 0 and is never
++	   actually used (could be any value).  */
++	.word	0
++	.word	L(ext_size_1) -.
++	.word	L(ext_size_2) -.
++	.word	L(ext_size_3) -.
++	.word	L(ext_size_4) -.
++	.word	L(ext_size_5) -.
++	.word	L(ext_size_6) -.
++	.word	L(ext_size_7) -.
++	.word	L(ext_size_8) -.
++	.word	L(ext_size_9) -.
++	.word	L(ext_size_10) -.
++	.word	L(ext_size_11) -.
++	.word	L(ext_size_12) -.
++	.word	L(ext_size_13) -.
++	.word	L(ext_size_14) -.
++	.word	L(ext_size_15) -.
++
++libc_hidden_builtin_def (MEMCPY)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memmove.S glibc-2.17-c758a686/sysdeps/aarch64/memmove.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memmove.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memmove.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1 @@
++/* memmove is part of memcpy.S.  */
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memrchr.S glibc-2.17-c758a686/sysdeps/aarch64/memrchr.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memrchr.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memrchr.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,166 @@
++/* memrchr - find the last occurrence of a byte in a memory block
++
++   Copyright (C) 2015-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++   
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ * Neon Available.
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define chrin		w1
++#define cntin		x2
++
++#define seek_dstin  x11
++#define seek_dst  x12
++#define result		x0
++
++#define src		x3
++#define	tmp		x4
++#define wtmp2		w5
++#define synd		x6
++#define soff		x9
++#define cntrem		x10
++
++#define vrepchr		v0
++#define vdata1		v1
++#define vdata2		v2
++
++#define vhas_chr1	v3
++#define vhas_chr2	v4
++#define vrepmask	v5
++#define vend		v6
++
++/*
++ * Core algorithm:
++ *
++ * For each 32-byte chunk we calculate a 64-bit syndrome value, with two bits
++ * per byte. For each tuple, bit 0 is set if the relevant byte matched the
++ * requested character and bit 1 is not used (faster than using a 32bit
++ * syndrome). Since the bits in the syndrome reflect exactly the order in which
++ * things occur in the original string, counting trailing zeros allows to
++ * identify exactly which byte has matched.
++ */
++ 
++ENTRY (__memrchr)
++	/* Do not dereference srcin if no bytes to compare.  */
++	cbz	cntin, L(zero_length)
++	/*
++	 * Magic constant 0x40100401 allows us to identify which lane matches
++	 * the requested byte.
++	 */
++	mov	wtmp2, #0x0401
++	movk	wtmp2, #0x4010, lsl #16
++	dup	vrepchr.16b, chrin
++	/* Work with aligned 32-byte chunks */
++	add	seek_dstin,  cntin, srcin
++	add	tmp, seek_dstin, #31
++	bic	seek_dst, tmp, #31
++	dup	vrepmask.4s, wtmp2
++	ands	soff, seek_dstin, #31
++	mov	tmp, #32
++	sub	soff,tmp,soff
++	and	cntrem, cntin, #31
++	b.eq	L(loop)
++
++	/*
++	 * Input string is not 32-byte aligned. We calculate the syndrome
++	 * value for the aligned 32 bytes block containing the first bytes
++	 * and mask the irrelevant part.
++	 */
++
++	sub	seek_dst, seek_dst, #32
++	ld1	{vdata1.16b, vdata2.16b}, [seek_dst]
++	sub	tmp, soff, #32
++	adds	cntin, cntin, tmp
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
++	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
++	mov	synd, vend.2d[0]
++	/* Clear the (32-soff)*2 upper bits */
++	lsl	tmp, soff, #1 	
++	lsl	synd, synd, tmp
++	lsr	synd, synd, tmp
++	/* The first block can also be the last */
++	b.ls	L(masklast)
++	/* Have we found something already? */
++	cbnz	synd, L(tail)
++
++L(loop):
++	sub	seek_dst, seek_dst, #32
++	ld1	{vdata1.16b, vdata2.16b}, [seek_dst]
++	subs	cntin, cntin, #32
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* If we're out of data we finish regardless of the result */
++	b.ls	L(end)
++	/* Use a fast check for the termination condition */
++	orr	vend.16b, vhas_chr1.16b, vhas_chr2.16b
++	addp	vend.2d, vend.2d, vend.2d
++	mov	synd, vend.2d[0]
++	/* We're not out of data, loop if we haven't found the character */
++	cbz	synd, L(loop)
++
++L(end):
++	/* Termination condition found, let's calculate the syndrome value */
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	addp	vend.16b, vhas_chr1.16b, vhas_chr2.16b		/* 256->128 */
++	addp	vend.16b, vend.16b, vend.16b			/* 128->64 */
++	mov	synd, vend.2d[0]
++	/* Only do the clear for the last possible block */
++	b.hi	L(tail)
++
++L(masklast):
++	/* Clear the (32 - ((cntrem + (32-soff)) % 32)) * 2 lower bits */	 
++	add	tmp, cntrem, soff
++	and	tmp, tmp, #31
++	sub	tmp, tmp, #32
++	neg	tmp, tmp, lsl #1	
++	lsr	synd, synd, tmp
++	lsl	synd, synd, tmp
++
++L(tail):
++	/* Compensate the last post-increment*/ 
++	add	seek_dst, seek_dst, #32
++	/* Check that we have found a character */
++	cmp	synd, #0
++	/* And count the leading zeros */
++	clz	synd, synd
++	/* Compute the potential result */
++	sub	result, seek_dst, synd, lsr #1
++	sub	result, result, #1
++	/* Select result or NULL */
++	csel	result, xzr, result, eq
++	ret
++
++L(zero_length):
++	mov	result, #0
++	ret
++END (__memrchr)
++weak_alias (__memrchr, memrchr)
++libc_hidden_builtin_def (memrchr)
++
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/memset.S glibc-2.17-c758a686/sysdeps/aarch64/memset.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/memset.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/memset.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,155 @@
++/* Copyright (C) 2012-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++#define dstin	x0
++#define val	x1
++#define valw	w1
++#define count	x2
++#define dst	x3
++#define dstend	x4
++#define tmp1	x5
++#define tmp1w	w5
++#define tmp2	x6
++#define tmp2w	w6
++#define zva_len x7
++#define zva_lenw w7
++
++#ifndef MEMSET
++# define MEMSET memset
++#endif
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64, unaligned accesses
++ *
++ */
++
++ENTRY_ALIGN (MEMSET, 6)
++
++	DELOUSE (0)
++	DELOUSE (2)
++
++	dup	v0.16B, valw
++	add	dstend, dstin, count
++
++	cmp	count, 96
++	b.hi	L(set_long)
++	cmp	count, 16
++	b.hs	L(set_medium)
++	mov	val, v0.D[0]
++
++	/* Set 0..15 bytes.  */
++	tbz	count, 3, 1f
++	str	val, [dstin]
++	str	val, [dstend, -8]
++	ret
++	nop
++1:	tbz	count, 2, 2f
++	str	valw, [dstin]
++	str	valw, [dstend, -4]
++	ret
++2:	cbz	count, 3f
++	strb	valw, [dstin]
++	tbz	count, 1, 3f
++	strh	valw, [dstend, -2]
++3:	ret
++
++	/* Set 17..96 bytes.  */
++L(set_medium):
++	str	q0, [dstin]
++	tbnz	count, 6, L(set96)
++	str	q0, [dstend, -16]
++	tbz	count, 5, 1f
++	str	q0, [dstin, 16]
++	str	q0, [dstend, -32]
++1:	ret
++
++	.p2align 4
++	/* Set 64..96 bytes.  Write 64 bytes from the start and
++	   32 bytes from the end.  */
++L(set96):
++	str	q0, [dstin, 16]
++	stp	q0, q0, [dstin, 32]
++	stp	q0, q0, [dstend, -32]
++	ret
++
++	.p2align 3
++	nop
++L(set_long):
++	and	valw, valw, 255
++	bic	dst, dstin, 15
++	str	q0, [dstin]
++	cmp	count, 512
++	ccmp	valw, 0, 0, cs
++	b.eq	L(zva_64)
++	cmp count, 208
++	b.ls    L(no_zva)
++	cmp count, 512
++	b.hi    L(no_zva)
++    sub	count, dstend, dst	/* Count is 16 too large.  */
++	sub	dst, dst, 16		/* Dst is biased by -32.  */
++	sub	count, count, 64 + 16	/* Adjust count and bias for loop.  */	
++1:	str	q0, [dst, 32]
++    str q0, [dst, 48]
++	str q0, [dst, 80]
++	str	q0, [dst, 64]!
++	subs	count, count, 64
++	b.hi	1b
++2:	str	q0, [dstend, -64]
++	str	q0, [dstend, -48]
++	str	q0, [dstend, -32]
++	str	q0, [dstend, -16]
++	ret	
++L(no_zva):
++	sub	count, dstend, dst	/* Count is 16 too large.  */
++	sub	dst, dst, 16		/* Dst is biased by -32.  */
++	sub	count, count, 64 + 16	/* Adjust count and bias for loop.  */	
++1:	stp	q0, q0, [dst, 32]
++	stp	q0, q0, [dst, 64]!
++	subs	count, count, 64
++	b.hi	1b
++2:	stp	q0, q0, [dstend, -64]
++	stp	q0, q0, [dstend, -32]
++	ret
++
++	/* Write the first and last 64 byte aligned block using stp rather
++	   than using DC ZVA.  This is faster on some cores.
++	 */
++L(zva_64):
++	str	q0, [dst, 16]
++	stp	q0, q0, [dst, 32]
++	bic	dst, dst, 63
++	stp	q0, q0, [dst, 64]
++	stp	q0, q0, [dst, 96]
++	sub	count, dstend, dst	/* Count is now 128 too large.	*/
++	sub	count, count, 128+64+64	/* Adjust count and bias for loop.  */
++	add	dst, dst, 128
++	nop
++1:	dc	zva, dst
++	add	dst, dst, 64
++	subs	count, count, 64
++	b.hi	1b
++	stp	q0, q0, [dst, 0]
++	stp	q0, q0, [dst, 32]
++	stp	q0, q0, [dstend, -64]
++	stp	q0, q0, [dstend, -32]
++	ret
++END (MEMSET)
++libc_hidden_builtin_def (MEMSET)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/nptl/pthread_spin_lock.S glibc-2.17-c758a686/sysdeps/aarch64/nptl/pthread_spin_lock.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/nptl/pthread_spin_lock.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/nptl/pthread_spin_lock.S	2020-03-03 10:24:50.087335642 +0800
+@@ -0,0 +1,103 @@
++/* pthread_spin_lock -- lock a spin lock. Generic version.
++   Copyright (C) 2012-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "port_aarch64.h"
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++ENTRY (pthread_spin_lock)
++        DELOUSE (0)
++
++        mov     w1, #0x1  //must be unchanged
++
++L(spin):
++		prfm    pldl1strm, [x0]
++		add		w3, w3, #0x1
++        ldaxr   w2, [x0]
++        cbnz    w2, L(spin)
++        stxr    w2, w1, [x0]
++        cbnz    w2, 1f
++		b		L(end)
++
++8:
++		wfe  //wait 50 us
++		b		L(normal)
++7:
++		mov		w6, #0x1b58  //loop times
++		b       L(loop_fun)
++
++6:
++		mov		w6, #0x1770  //loop times
++		b       L(loop_fun)
++
++5:
++		mov     w6, #0x1388  //loop times
++		b       L(loop_fun)
++
++4:		mov 	w6, #0x0fa0  //loop times
++		b       L(loop_fun)
++
++3:
++		mov     w6, #0x0bb8  //loop times
++		b       L(loop_fun)
++
++2:		mov     w6, #0x07d0  //loop times
++		b       L(loop_fun)
++   
++1:
++		mov     w6, #0x03e8  //loop times
++		b		L(loop_fun)
++
++L(normal):
++		ldr		w2, [x0]
++		cbz		w2, L(spin)	
++		and     w3, w3, #0x07  //get lower 3 bits
++        cmp     w3, #0x01
++        beq     1b
++        cmp     w3, #0x02
++        beq     2b
++        cmp     w3, #0x03
++        beq     3b
++		cmp     w3, #0x04
++        beq     4b
++		cmp     w3, #0x05
++        beq     5b
++		cmp     w3, #0x06
++        beq     6b
++		cmp     w3, #0x07
++        beq     7b
++		cmp     w3, #0x0
++        beq     8b
++        bne     L(spin)	
++
++L(loop_fun):
++		mov		w5, #0x0
++L(loop):
++		add		w5, w5, #0x1
++		cmp		w5, w6    //w6 times
++		b.lt	L(loop)
++		b		L(normal)		
++
++L(end):
++        mov     w0, #0x0
++        ret
++        nop
++
++END (pthread_spin_lock)
++libc_hidden_builtin_def (pthread_spin_lock)
++weak_alias (pthread_spin_lock, index)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/port_aarch64.h glibc-2.17-c758a686/sysdeps/aarch64/port_aarch64.h
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/port_aarch64.h	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/port_aarch64.h	2020-03-03 10:23:40.625593365 +0800
+@@ -0,0 +1,165 @@
++/* Copyright (C) 1997-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#ifndef _AARCH64_SYSDEP_H
++#define _AARCH64_SYSDEP_H
++
++#include <sysdeps/generic/sysdep.h>
++
++#define port_ret                mov     pc, r14
++
++
++#ifdef __LP64__
++# define AARCH64_R(NAME)        R_AARCH64_ ## NAME
++# define PTR_REG(n)             x##n
++# define PTR_LOG_SIZE           3
++# define DELOUSE(n)
++#else
++# define AARCH64_R(NAME)        R_AARCH64_P32_ ## NAME
++# define PTR_REG(n)             w##n
++# define PTR_LOG_SIZE           2
++# define DELOUSE(n)             mov     w##n, w##n
++#endif
++
++#define PTR_SIZE        (1<<PTR_LOG_SIZE)
++
++#ifdef  __ASSEMBLER__
++
++/* Syntactic details of assembler.  */
++
++#define ASM_SIZE_DIRECTIVE(name) .size name,.-name
++
++/* Define an entry point visible from C.  */
++#define ENTRY(name)                                             \
++  .globl C_SYMBOL_NAME(name);                                   \
++  .type C_SYMBOL_NAME(name),%function;                          \
++  .align 4;                                                     \
++  C_LABEL(name)                                                 \
++  cfi_startproc;                                                \
++  CALL_MCOUNT
++
++/* Define an entry point visible from C.  */
++#define ENTRY_ALIGN(name, align)                                \
++  .globl C_SYMBOL_NAME(name);                                   \
++  .type C_SYMBOL_NAME(name),%function;                          \
++  .p2align align;                                               \
++  C_LABEL(name)                                                 \
++  cfi_startproc;                                                \
++  CALL_MCOUNT
++
++/* Define an entry point visible from C with a specified alignment and
++   pre-padding with NOPs.  This can be used to ensure that a critical
++   loop within a function is cache line aligned.  Note this version
++   does not adjust the padding if CALL_MCOUNT is defined. */
++
++#define ENTRY_ALIGN_AND_PAD(name, align, padding)               \
++  .globl C_SYMBOL_NAME(name);                                   \
++  .type C_SYMBOL_NAME(name),%function;                          \
++  .p2align align;                                               \
++  .rep padding;                                                 \
++  nop;                                                          \
++  .endr;                                                        \
++  C_LABEL(name)                                                 \
++  cfi_startproc;                                                \
++  CALL_MCOUNT
++
++#undef  END
++#define END(name)                                               \
++  cfi_endproc;                                                  \
++  ASM_SIZE_DIRECTIVE(name)
++
++/* If compiled for profiling, call `mcount' at the start of each function.  */
++#ifdef  PROF
++# define CALL_MCOUNT                                            \
++        str     x30, [sp, #-80]!;                               \
++        cfi_adjust_cfa_offset (80);                             \
++        cfi_rel_offset (x30, 0);                                \
++        stp     x0, x1, [sp, #16];                              \
++        cfi_rel_offset (x0, 16);                                \
++        cfi_rel_offset (x1, 24);                                \
++        stp     x2, x3, [sp, #32];                              \
++        cfi_rel_offset (x2, 32);                                \
++        cfi_rel_offset (x3, 40);                                \
++        stp     x4, x5, [sp, #48];                              \
++        cfi_rel_offset (x4, 48);                                \
++        cfi_rel_offset (x5, 56);                                \
++        stp     x6, x7, [sp, #64];                              \
++        cfi_rel_offset (x6, 64);                                \
++        cfi_rel_offset (x7, 72);                                \
++        mov     x0, x30;                                        \
++        bl      mcount;                                         \
++        ldp     x0, x1, [sp, #16];                              \
++        cfi_restore (x0);                                       \
++        cfi_restore (x1);                                       \
++        ldp     x2, x3, [sp, #32];                              \
++        cfi_restore (x2);                                       \
++        cfi_restore (x3);                                       \
++        ldp     x4, x5, [sp, #48];                              \
++        cfi_restore (x4);                                       \
++        cfi_restore (x5);                                       \
++        ldp     x6, x7, [sp, #64];                              \
++        cfi_restore (x6);                                       \
++        cfi_restore (x7);                                       \
++        ldr     x30, [sp], #80;                                 \
++        cfi_adjust_cfa_offset (-80);                            \
++        cfi_restore (x30);
++#else
++# define CALL_MCOUNT            /* Do nothing.  */
++#endif
++
++/* Local label name for asm code.  */
++#ifndef L
++# define L(name)         .L##name
++#endif
++
++/* Load or store to/from a pc-relative EXPR into/from R, using T.
++   Note R and T are register numbers and not register names.  */
++#define LDST_PCREL(OP, R, T, EXPR)                      \
++        adrp    x##T, EXPR;                             \
++        OP      PTR_REG (R), [x##T, #:lo12:EXPR];       \
++
++/* Load or store to/from a got-relative EXPR into/from R, using T.
++   Note R and T are register numbers and not register names.  */
++#define LDST_GLOBAL(OP, R, T,  EXPR)                    \
++        adrp    x##T, :got:EXPR;                        \
++        ldr     PTR_REG (T), [x##T, #:got_lo12:EXPR];   \
++        OP      PTR_REG (R), [x##T];
++
++/* Load an immediate into R.
++   Note R is a register number and not a register name.  */
++#ifdef __LP64__
++# define MOVL(R, NAME)                                  \
++        movz    PTR_REG (R), #:abs_g3:NAME;             \
++        movk    PTR_REG (R), #:abs_g2_nc:NAME;          \
++        movk    PTR_REG (R), #:abs_g1_nc:NAME;          \
++        movk    PTR_REG (R), #:abs_g0_nc:NAME;
++#else
++# define MOVL(R, NAME)                                  \
++        movz    PTR_REG (R), #:abs_g1:NAME;             \
++        movk    PTR_REG (R), #:abs_g0_nc:NAME;
++#endif
++
++/* Since C identifiers are not normally prefixed with an underscore
++   on this system, the asm identifier `syscall_error' intrudes on the
++   C name space.  Make sure we use an innocuous name.  */
++#define syscall_error   __syscall_error
++#define mcount          _mcount
++
++#endif  /* __ASSEMBLER__ */
++
++#endif  /* _AARCH64_SYSDEP_H */
+\ 文件尾没有 newline 字符
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/pthread_spin_trylock.S glibc-2.17-c758a686/sysdeps/aarch64/pthread_spin_trylock.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/pthread_spin_trylock.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/pthread_spin_trylock.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,46 @@
++/* pthread_spin_trylock -- try lock a spin lock. Generic version.
++   Copyright (C) 2012-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++ENTRY (pthread_spin_trylock)
++	DELOUSE (0)
++	mov     w1, #0x1                        // #1
++	
++L(spin):
++	ldaxr   w2, [x0]
++	cbnz	w2, L(fail)	
++	stxr    w3, w1, [x0]
++	cbnz	w3, L(spin)
++	mov	w0, #0
++	ret
++	nop
++
++L(fail):
++	mov	w0, #16
++	ret
++	nop
++
++END (pthread_spin_trylock)
++libc_hidden_builtin_def (pthread_spin_trylock)
++weak_alias (pthread_spin_trylock, index)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/pthread_spin_unlock.S glibc-2.17-c758a686/sysdeps/aarch64/pthread_spin_unlock.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/pthread_spin_unlock.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/pthread_spin_unlock.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,35 @@
++/* pthread_spin_unlock -- unlock a spin lock. Generic version.
++   Copyright (C) 2012-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++ENTRY (pthread_spin_unlock)
++	DELOUSE (0)
++	stlr    wzr, [x0]
++	mov     w0, #0x0                        // #0
++	ret
++	nop
++
++END (pthread_spin_unlock)
++libc_hidden_builtin_def (pthread_spin_unlock)
++weak_alias (pthread_spin_unlock, index)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strchrnul.S glibc-2.17-c758a686/sysdeps/aarch64/strchrnul.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strchrnul.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strchrnul.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,145 @@
++/* strchrnul - find a character or nul in a string
++
++   Copyright (C) 2014-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ * Neon Available.
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define chrin		w1
++
++#define result		x0
++
++/* Locals and temporaries.  */
++
++#define src		x2
++#define tmp1		x3
++#define wtmp2		w4
++#define tmp3		x5
++
++#define vrepchr		v0
++#define vdata1		v1
++#define vdata2		v2
++#define vhas_nul1	v3
++#define vhas_nul2	v4
++#define vhas_chr1	v5
++#define vhas_chr2	v6
++#define vrepmask	v7
++#define vend1		v16
++
++/* Core algorithm.
++
++   For each 32-byte hunk we calculate a 64-bit syndrome value, with
++   two bits per byte (LSB is always in bits 0 and 1, for both big
++   and little-endian systems).  For each tuple, bit 0 is set iff
++   the relevant byte matched the requested character or nul.  Since the
++   bits in the syndrome reflect exactly the order in which things occur
++   in the original string a count_trailing_zeros() operation will
++   identify exactly which byte is causing the termination.  */
++
++ENTRY (__strchrnul)
++	DELOUSE (0)
++	/* Magic constant 0x40100401 to allow us to identify which lane
++	   matches the termination condition.  */
++	mov		wtmp2, #0x0401
++	movk	wtmp2, #0x4010, lsl #16
++	dup		vrepchr.16b, chrin
++	bic		src, srcin, #31		/* Work with aligned 32-byte hunks.  */
++	dup		vrepmask.4s, wtmp2
++	ands	tmp1, srcin, #31
++	b.eq	L(loop)
++
++	/* Input string is not 32-byte aligned.  Rather than forcing
++	   the padding bytes to a safe value, we calculate the syndrome
++	   for all the bytes, but then mask off those bits of the
++	   syndrome that are related to the padding.  */
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	neg		tmp1, tmp1
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	orr		vhas_chr1.16b, vhas_chr1.16b, vhas_nul1.16b
++	orr		vhas_chr2.16b, vhas_chr2.16b, vhas_nul2.16b
++	and		vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and		vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	lsl		tmp1, tmp1, #1
++	addp	vend1.16b, vhas_chr1.16b, vhas_chr2.16b	// 256->128
++	mov		tmp3, #~0
++	addp	vend1.16b, vend1.16b, vend1.16b		// 128->64
++	lsr		tmp1, tmp3, tmp1
++
++	mov		tmp3, vend1.2d[0]
++	bic		tmp1, tmp3, tmp1	// Mask padding bits.
++	cbnz	tmp1, L(tail)
++
++L(loop):
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* Use a fast check for the termination condition.  */
++	orr		vhas_chr1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vhas_chr2.16b, vhas_nul2.16b, vhas_chr2.16b
++	orr		vend1.16b, vhas_chr1.16b, vhas_chr2.16b
++	addp	vend1.2d, vend1.2d, vend1.2d
++	mov		tmp1, vend1.2d[0]
++	cbnz	tmp1, L(termination)
++
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* Use a fast check for the termination condition.  */
++	orr		vhas_chr1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vhas_chr2.16b, vhas_nul2.16b, vhas_chr2.16b
++	orr		vend1.16b, vhas_chr1.16b, vhas_chr2.16b
++	addp	vend1.2d, vend1.2d, vend1.2d
++	mov		tmp1, vend1.2d[0]
++	cbz		tmp1, L(loop)
++
++	/* Termination condition found.  Now need to establish exactly why
++	   we terminated.  */
++L(termination):
++	and		vhas_chr1.16b, vhas_chr1.16b, vrepmask.16b
++	and		vhas_chr2.16b, vhas_chr2.16b, vrepmask.16b
++	addp	vend1.16b, vhas_chr1.16b, vhas_chr2.16b		// 256->128
++	addp	vend1.16b, vend1.16b, vend1.16b		// 128->64
++
++	mov	tmp1, vend1.2d[0]
++L(tail):
++	/* Count the trailing zeros, by bit reversing...  */
++	rbit	tmp1, tmp1
++	/* Re-bias source.  */
++	sub		src, src, #32
++	clz		tmp1, tmp1	/* ... and counting the leading zeros.  */
++	/* tmp1 is twice the offset into the fragment.  */
++	add		result, src, tmp1, lsr #1
++	ret
++
++END(__strchrnul)
++weak_alias (__strchrnul, strchrnul)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strchr.S glibc-2.17-c758a686/sysdeps/aarch64/strchr.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strchr.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strchr.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,154 @@
++/* strchr - find a character in a string
++
++   Copyright (C) 2014-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define chrin		w1
++
++#define result		x0
++
++#define src		x2
++#define tmp1		x3
++#define wtmp2		w4
++#define tmp3		x5
++
++#define vrepchr		v0
++#define vdata1		v1
++#define vdata2		v2
++#define vhas_nul1	v3
++#define vhas_nul2	v4
++#define vhas_chr1	v5
++#define vhas_chr2	v6
++#define vrepmask_0	v7
++#define vrepmask_c	v16
++#define vend1		v17
++#define vend2		v18
++
++	/* Core algorithm.
++	   For each 32-byte hunk we calculate a 64-bit syndrome value, with
++	   two bits per byte (LSB is always in bits 0 and 1, for both big
++	   and little-endian systems).  Bit 0 is set iff the relevant byte
++	   matched the requested character.  Bit 1 is set iff the
++	   relevant byte matched the NUL end of string (we trigger off bit0
++	   for the special case of looking for NUL).  Since the bits
++	   in the syndrome reflect exactly the order in which things occur
++	   in the original string a count_trailing_zeros() operation will
++	   identify exactly which byte is causing the termination, and why.  */
++
++/* Locals and temporaries.  */
++
++ENTRY (strchr)
++	DELOUSE (0)
++	mov		wtmp2, #0x0401
++	movk	wtmp2, #0x4010, lsl #16
++	dup		vrepchr.16b, chrin
++	bic		src, srcin, #31
++	dup		vrepmask_c.4s, wtmp2
++	ands	tmp1, srcin, #31
++	add		vrepmask_0.4s, vrepmask_c.4s, vrepmask_c.4s // lsl #1
++	b.eq	L(loop)
++
++	/* Input string is not 32-byte aligned.  Rather than forcing
++	   the padding bytes to a safe value, we calculate the syndrome
++	   for all the bytes, but then mask off those bits of the
++	   syndrome that are related to the padding.  */
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	neg		tmp1, tmp1
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	and		vhas_nul1.16b, vhas_nul1.16b, vrepmask_0.16b
++	and		vhas_nul2.16b, vhas_nul2.16b, vrepmask_0.16b
++	and		vhas_chr1.16b, vhas_chr1.16b, vrepmask_c.16b
++	and		vhas_chr2.16b, vhas_chr2.16b, vrepmask_c.16b
++	orr		vend1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vend2.16b, vhas_nul2.16b, vhas_chr2.16b
++	lsl		tmp1, tmp1, #1
++	addp	vend1.16b, vend1.16b, vend2.16b		// 256->128
++	mov		tmp3, #~0
++	addp	vend1.16b, vend1.16b, vend2.16b		// 128->64
++	lsr		tmp1, tmp3, tmp1
++
++	mov		tmp3, vend1.2d[0]
++	bic		tmp1, tmp3, tmp1	// Mask padding bits.
++	cbnz	tmp1, L(tail)
++
++L(loop):
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* Use a fast check for the termination condition.  */
++	orr		vend1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vend2.16b, vhas_nul2.16b, vhas_chr2.16b
++	orr		vend1.16b, vend1.16b, vend2.16b
++	addp	vend1.2d, vend1.2d, vend1.2d
++	mov		tmp1, vend1.2d[0]
++	cbnz	tmp1, L(termination) 
++
++	/* second times in L(loop) to avoid 65-96 bytes performance failure */
++	ld1		{vdata1.16b, vdata2.16b}, [src], #32
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	/* Use a fast check for the termination condition.  */
++	orr		vend1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vend2.16b, vhas_nul2.16b, vhas_chr2.16b
++	orr		vend1.16b, vend1.16b, vend2.16b
++	addp	vend1.2d, vend1.2d, vend1.2d
++	mov		tmp1, vend1.2d[0]
++	cbz		tmp1, L(loop)
++
++	/* Termination condition found.  Now need to establish exactly why
++	   we terminated.  */
++L(termination):
++	and		vhas_nul1.16b, vhas_nul1.16b, vrepmask_0.16b
++	and		vhas_nul2.16b, vhas_nul2.16b, vrepmask_0.16b
++	and		vhas_chr1.16b, vhas_chr1.16b, vrepmask_c.16b
++	and		vhas_chr2.16b, vhas_chr2.16b, vrepmask_c.16b
++	orr		vend1.16b, vhas_nul1.16b, vhas_chr1.16b
++	orr		vend2.16b, vhas_nul2.16b, vhas_chr2.16b
++	addp	vend1.16b, vend1.16b, vend2.16b		// 256->128
++	addp	vend1.16b, vend1.16b, vend2.16b		// 128->64
++
++	mov		tmp1, vend1.2d[0]
++L(tail):
++	sub		src, src, #32
++	rbit	tmp1, tmp1
++	clz		tmp1, tmp1
++	/* Tmp1 is even if the target charager was found first.  Otherwise
++	   we've found the end of string and we weren't looking for NUL.  */
++	tst		tmp1, #1
++	add		result, src, tmp1, lsr #1
++	csel	result, result, xzr, eq
++	ret
++END (strchr)
++libc_hidden_builtin_def (strchr)
++weak_alias (strchr, index)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strcmp.S glibc-2.17-c758a686/sysdeps/aarch64/strcmp.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strcmp.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strcmp.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,184 @@
++/* Copyright (C) 2012-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++#include <port_aarch64.h>
++
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++/* Parameters and result.  */
++#define src1		x0
++#define src2		x1
++#define result		x0
++
++/* Internal variables.  */
++#define data1		x2
++#define data1w		w2
++#define data2		x3
++#define data2w		w3
++#define has_nul		x4
++#define diff		x5
++#define syndrome	x6
++#define tmp1		x7
++#define tmp2		x8
++#define tmp3		x9
++#define zeroones	x10
++#define pos		x11
++
++	/* Start of performance-critical section  -- one 64B cache line.  */
++ENTRY_ALIGN(strcmp, 6)
++
++	DELOUSE (0)
++	DELOUSE (1)
++	eor	tmp1, src1, src2
++	mov	zeroones, #REP8_01
++	tst	tmp1, #7
++	b.ne	L(misaligned8)
++	ands	tmp1, src1, #7
++	b.ne	L(mutual_align)
++	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	   can be done in parallel across the entire word.  */
++L(loop_aligned):
++	ldr	data1, [src1], #8
++	ldr	data2, [src2], #8
++L(start_realigned):
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	bic	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	orr	syndrome, diff, has_nul
++	cbz	syndrome, L(loop_aligned)
++	/* End of performance-critical section  -- one 64B cache line.  */
++
++L(end):
++#ifndef	__AARCH64EB__
++	rev	syndrome, syndrome
++	rev	data1, data1
++	/* The MS-non-zero bit of the syndrome marks either the first bit
++	   that is different, or the top bit of the first zero byte.
++	   Shifting left now will bring the critical information into the
++	   top bits.  */
++	clz	pos, syndrome
++	rev	data2, data2
++	lsl	data1, data1, pos
++	lsl	data2, data2, pos
++	/* But we need to zero-extend (char is unsigned) the value and then
++	   perform a signed 32-bit subtraction.  */
++	lsr	data1, data1, #56
++	sub	result, data1, data2, lsr #56
++	RET
++#else
++	/* For big-endian we cannot use the trick with the syndrome value
++	   as carry-propagation can corrupt the upper bits if the trailing
++	   bytes in the string contain 0x01.  */
++	/* However, if there is no NUL byte in the dword, we can generate
++	   the result directly.  We can't just subtract the bytes as the
++	   MSB might be significant.  */
++	cbnz	has_nul, 1f
++	cmp	data1, data2
++	cset	result, ne
++	cneg	result, result, lo
++	RET
++1:
++	/* Re-compute the NUL-byte detection, using a byte-reversed value.  */
++	rev	tmp3, data1
++	sub	tmp1, tmp3, zeroones
++	orr	tmp2, tmp3, #REP8_7f
++	bic	has_nul, tmp1, tmp2
++	rev	has_nul, has_nul
++	orr	syndrome, diff, has_nul
++	clz	pos, syndrome
++	/* The MS-non-zero bit of the syndrome marks either the first bit
++	   that is different, or the top bit of the first zero byte.
++	   Shifting left now will bring the critical information into the
++	   top bits.  */
++	lsl	data1, data1, pos
++	lsl	data2, data2, pos
++	/* But we need to zero-extend (char is unsigned) the value and then
++	   perform a signed 32-bit subtraction.  */
++	lsr	data1, data1, #56
++	sub	result, data1, data2, lsr #56
++	RET
++#endif
++
++L(mutual_align):
++	/* Sources are mutually aligned, but are not currently at an
++	   alignment boundary.  Round down the addresses and then mask off
++	   the bytes that preceed the start point.  */
++	bic	src1, src1, #7
++	bic	src2, src2, #7
++	lsl	tmp1, tmp1, #3		/* Bytes beyond alignment -> bits.  */
++	ldr	data1, [src1], #8
++	neg	tmp1, tmp1		/* Bits to alignment -64.  */
++	ldr	data2, [src2], #8
++	mov	tmp2, #~0
++#ifdef __AARCH64EB__
++	/* Big-endian.  Early bytes are at MSB.  */
++	lsl	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
++#else
++	/* Little-endian.  Early bytes are at LSB.  */
++	lsr	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
++#endif
++	orr	data1, data1, tmp2
++	orr	data2, data2, tmp2
++	b	L(start_realigned)
++
++L(misaligned8):
++	/* Align SRC1 to 8 bytes and then compare 8 bytes at a time, always
++	   checking to make sure that we don't access beyond page boundary in
++	   SRC2.  */
++	tst	src1, #7
++	b.eq	L(loop_misaligned)
++L(do_misaligned):
++	ldrb	data1w, [src1], #1
++	ldrb	data2w, [src2], #1
++	cmp	data1w, #1
++	ccmp	data1w, data2w, #0, cs	/* NZCV = 0b0000.  */
++	b.ne	L(done)
++	tst	src1, #7
++	b.ne	L(do_misaligned)
++
++L(loop_misaligned):
++	/* Test if we are within the last dword of the end of a 4K page.  If
++	   yes then jump back to the misaligned loop to copy a byte at a time.  */
++	and	tmp1, src2, #0xff8
++	eor	tmp1, tmp1, #0xff8
++	cbz	tmp1, L(do_misaligned)
++	ldr	data1, [src1], #8
++	ldr	data2, [src2], #8
++
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	bic	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	orr	syndrome, diff, has_nul
++	cbz	syndrome, L(loop_misaligned)
++	b	L(end)
++
++L(done):
++	sub	result, data1, data2
++	RET
++END(strcmp)
++libc_hidden_builtin_def (strcmp)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strcpy.S glibc-2.17-c758a686/sysdeps/aarch64/strcpy.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strcpy.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strcpy.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,323 @@
++/* strcpy/stpcpy - copy a string returning pointer to start/end.
++   Copyright (C) 2013-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++/* To build as stpcpy, define BUILD_STPCPY before compiling this file.
++
++   To test the page crossing code path more thoroughly, compile with
++   -DSTRCPY_TEST_PAGE_CROSS - this will force all unaligned copies through
++   the slower entry path.  This option is not intended for production use.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64, unaligned accesses, min page size 4k.
++ */
++
++/* Arguments and results.  */
++#define dstin		x0
++#define srcin		x1
++
++/* Locals and temporaries.  */
++#define src		x2
++#define dst		x3
++#define data1		x4
++#define data1w		w4
++#define data2		x5
++#define data2w		w5
++#define has_nul1	x6
++#define has_nul2	x7
++#define tmp1		x8
++#define tmp2		x9
++#define tmp3		x10
++#define tmp4		x11
++#define zeroones	x12
++#define data1a		x13
++#define data2a		x14
++#define pos		x15
++#define len		x16
++#define to_align	x17
++
++/* NEON register */
++#define dataq		q2
++#define datav		v2
++#define datab2		b3
++#define datav2		v3
++
++#ifdef BUILD_STPCPY
++#define STRCPY __stpcpy
++#else
++#define STRCPY strcpy
++#endif
++
++	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	   can be done in parallel across the entire word.  */
++
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++	/* AArch64 systems have a minimum page size of 4k.  We can do a quick
++	   page size check for crossing this boundary on entry and if we
++	   do not, then we can short-circuit much of the entry code.  We
++	   expect early page-crossing strings to be rare (probability of
++	   16/MIN_PAGE_SIZE ~= 0.4%), so the branch should be quite
++	   predictable, even with random strings.
++
++	   We don't bother checking for larger page sizes, the cost of setting
++	   up the correct page size is just not worth the extra gain from
++	   a small reduction in the cases taking the slow path.  Note that
++	   we only care about whether the first fetch, which may be
++	   misaligned, crosses a page boundary - after that we move to aligned
++	   fetches for the remainder of the string.  */
++
++#ifdef STRCPY_TEST_PAGE_CROSS
++	/* Make everything that isn't Qword aligned look like a page cross.  */
++#define MIN_PAGE_P2 4
++#else
++#define MIN_PAGE_P2 12
++#endif
++
++#define MIN_PAGE_SIZE (1 << MIN_PAGE_P2)
++
++ENTRY_ALIGN (STRCPY, 6)
++	DELOUSE (0)
++	DELOUSE (1)
++	/* For moderately short strings, the fastest way to do the copy is to
++	   calculate the length of the string in the same way as strlen, then
++	   essentially do a memcpy of the result.  This avoids the need for
++	   multiple byte copies and further means that by the time we
++	   reach the bulk copy loop we know we can always use DWord
++	   accesses.  We expect strcpy to rarely be called repeatedly
++	   with the same source string, so branch prediction is likely to
++	   always be difficult - we mitigate against this by preferring
++	   conditional select operations over branches whenever this is
++	   feasible.  */
++	and	tmp2, srcin, #(MIN_PAGE_SIZE - 1)
++	mov	zeroones, #REP8_01
++	and	to_align, srcin, #15
++	cmp	tmp2, #(MIN_PAGE_SIZE - 16)
++	neg	tmp1, to_align
++	/* The first fetch will straddle a (possible) page boundary iff
++	   srcin + 15 causes bit[MIN_PAGE_P2] to change value.  A 16-byte
++	   aligned string will never fail the page align check, so will
++	   always take the fast path.  */
++	b.gt	L(page_cross)
++
++L(page_cross_ok):
++	ldp	data1, data2, [srcin]
++#ifdef __AARCH64EB__
++	/* Because we expect the end to be found within 16 characters
++	   (profiling shows this is the most common case), it's worth
++	   swapping the bytes now to save having to recalculate the
++	   termination syndrome later.  We preserve data1 and data2
++	   so that we can re-use the values later on.  */
++	rev	tmp2, data1
++	sub	tmp1, tmp2, zeroones
++	orr	tmp2, tmp2, #REP8_7f
++	bics	has_nul1, tmp1, tmp2
++	b.ne	L(fp_le8)
++	rev	tmp4, data2
++	sub	tmp3, tmp4, zeroones
++	orr	tmp4, tmp4, #REP8_7f
++#else
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	bics	has_nul1, tmp1, tmp2
++	b.ne	L(fp_le8)
++	sub	tmp3, data2, zeroones
++	orr	tmp4, data2, #REP8_7f
++#endif
++	bics	has_nul2, tmp3, tmp4
++	b.eq	L(bulk_entry)
++
++	/* The string is short (<=16 bytes).  We don't know exactly how
++	   short though, yet.  Work out the exact length so that we can
++	   quickly select the optimal copy strategy.  */
++L(fp_gt8):
++	rev	has_nul2, has_nul2
++	clz	pos, has_nul2
++	mov	tmp2, #56
++	add	dst, dstin, pos, lsr #3		/* Bits to bytes.  */
++	sub	pos, tmp2, pos
++#ifdef __AARCH64EB__
++	lsr	data2, data2, pos
++#else
++	lsl	data2, data2, pos
++#endif
++	str	data2, [dst, #1]
++	str	data1, [dstin]
++#ifdef BUILD_STPCPY
++	add	dstin, dst, #8
++#endif
++	ret
++
++L(fp_le8):
++	rev	has_nul1, has_nul1
++	clz	pos, has_nul1
++	add	dst, dstin, pos, lsr #3		/* Bits to bytes.  */
++	subs	tmp2, pos, #24			/* Pos in bits. */
++	b.lt	L(fp_lt4)
++#ifdef __AARCH64EB__
++	mov	tmp2, #56
++	sub	pos, tmp2, pos
++	lsr	data2, data1, pos
++	lsr	data1, data1, #32
++#else
++	lsr	data2, data1, tmp2
++#endif
++	/* 4->7 bytes to copy.  */
++	str	data2w, [dst, #-3]
++	str	data1w, [dstin]
++#ifdef BUILD_STPCPY
++	mov	dstin, dst
++#endif
++	ret
++L(fp_lt4):
++	cbz	pos, L(fp_lt2)
++	/* 2->3 bytes to copy.  */
++#ifdef __AARCH64EB__
++	lsr	data1, data1, #48
++#endif
++	strh	data1w, [dstin]
++	/* Fall-through, one byte (max) to go.  */
++L(fp_lt2):
++	/* Null-terminated string.  Last character must be zero!  */
++	strb	wzr, [dst]
++#ifdef BUILD_STPCPY
++	mov	dstin, dst
++#endif
++	ret
++
++	/* Aligning here ensures that the entry code and main loop all lies
++	   within one 64-byte cache line.  */
++L(bulk_entry):
++	sub	to_align, to_align, #16
++	stp	data1, data2, [dstin]
++	sub	src, srcin, to_align
++	sub	dst, dstin, to_align
++	b	L(entry_no_page_cross)
++
++	/* The inner loop deals with two Dwords at a time.  This has a
++	   slightly higher start-up cost, but we should win quite quickly,
++	   especially on cores with a high number of issue slots per
++	   cycle, as we get much better parallelism out of the operations.  */
++L(main_loop):
++	str	dataq, [dst], #16
++L(entry_no_page_cross):
++	ldr	dataq, [src], #16
++	uminv	datab2, datav.16b
++	mov	tmp3, datav2.d[0]
++	cbnz	tmp3, L(main_loop)
++
++	/* Since we know we are copying at least 16 bytes, the fastest way
++	   to deal with the tail is to determine the location of the
++	   trailing NUL, then (re)copy the 16 bytes leading up to that.  */
++#ifdef __AARCH64EB__
++	rev64	datav.16b, datav.16b
++#endif
++	/* 算出loc */
++	cmeq	datav.16b, datav.16b, #0
++	mov	data1, datav.d[0]
++	mov	data2, datav.d[1]
++	cmp	data1, 0
++	csel	data1, data1, data2, ne
++	mov	pos, 8
++	rev	data1, data1
++	clz	tmp1, data1
++	csel	pos, xzr, pos, ne
++	add	pos, pos, tmp1, lsr 3
++	add	src, src, pos
++	add	dst, dst, pos
++	ldr	dataq,[src, #-31]
++	str	dataq,[dst, #-15]
++#ifdef BUILD_STPCPY
++	mov	dstin, dst
++#endif
++	ret
++
++L(page_cross):
++	bic	src, srcin, #15
++	/* Start by loading two words at [srcin & ~15], then forcing the
++	   bytes that precede srcin to 0xff.  This means they never look
++	   like termination bytes.  */
++	ldp	data1, data2, [src]
++	lsl	tmp1, tmp1, #3	/* Bytes beyond alignment -> bits.  */
++	tst	to_align, #7
++	csetm	tmp2, ne
++#ifdef __AARCH64EB__
++	lsl	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
++#else
++	lsr	tmp2, tmp2, tmp1	/* Shift (tmp1 & 63).  */
++#endif
++	orr	data1, data1, tmp2
++	orr	data2a, data2, tmp2
++	cmp	to_align, #8
++	csinv	data1, data1, xzr, lt
++	csel	data2, data2, data2a, lt
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	sub	tmp3, data2, zeroones
++	orr	tmp4, data2, #REP8_7f
++	bic	has_nul1, tmp1, tmp2
++	bics	has_nul2, tmp3, tmp4
++	ccmp	has_nul1, #0, #0, eq	/* NZCV = 0000  */
++	b.eq	L(page_cross_ok)
++	/* We now need to make data1 and data2 look like they've been
++	   loaded directly from srcin.  Do a rotate on the 128-bit value.  */
++	lsl	tmp1, to_align, #3	/* Bytes->bits.  */
++	neg	tmp2, to_align, lsl #3
++#ifdef __AARCH64EB__
++	lsl	data1a, data1, tmp1
++	lsr	tmp4, data2, tmp2
++	lsl	data2, data2, tmp1
++	orr	tmp4, tmp4, data1a
++	cmp	to_align, #8
++	csel	data1, tmp4, data2, lt
++	rev	tmp2, data1
++	rev	tmp4, data2
++	sub	tmp1, tmp2, zeroones
++	orr	tmp2, tmp2, #REP8_7f
++	sub	tmp3, tmp4, zeroones
++	orr	tmp4, tmp4, #REP8_7f
++#else
++	lsr	data1a, data1, tmp1
++	lsl	tmp4, data2, tmp2
++	lsr	data2, data2, tmp1
++	orr	tmp4, tmp4, data1a
++	cmp	to_align, #8
++	csel	data1, tmp4, data2, lt
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	sub	tmp3, data2, zeroones
++	orr	tmp4, data2, #REP8_7f
++#endif
++	bic	has_nul1, tmp1, tmp2
++	cbnz	has_nul1, L(fp_le8)
++	bic	has_nul2, tmp3, tmp4
++	b	L(fp_gt8)
++END (STRCPY)
++
++#ifdef BUILD_STPCPY
++weak_alias (__stpcpy, stpcpy)
++libc_hidden_def (__stpcpy)
++libc_hidden_builtin_def (stpcpy)
++#else
++libc_hidden_builtin_def (strcpy)
++#endif
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strlen.S glibc-2.17-c758a686/sysdeps/aarch64/strlen.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strlen.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strlen.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,164 @@
++/* Strlen implementation that uses ASIMD instructions for load and NULL checks.
++   Copyright (C) 2018-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++
++   ARMv8-a, AArch64, ASIMD, unaligned accesses, min page size 4k.  */
++
++/* To test the page crossing code path more thoroughly, compile with
++   -DTEST_PAGE_CROSS - this will force all calls through the slower
++   entry path.  This option is not intended for production use.  */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define len		x0
++
++/* Locals and temporaries.  */
++#define src		x1
++#define data1		x2
++#define data2		x3
++#define has_nul1	x4
++#define has_nul2	x5
++#define tmp1		x4
++#define tmp2		x5
++#define tmp3		x6
++#define tmp4		x7
++#define zeroones	x8
++#define dataq		q2
++#define datav		v2
++#define datab2		b3
++#define dataq2		q3
++#define datav2		v3
++
++#define MIN_PAGE_SIZE 4096
++
++	/* Since strings are short on average, we check the first 16 bytes
++	   of the string for a NUL character.  In order to do an unaligned load
++	   safely we have to do a page cross check first.  If there is a NUL
++	   byte we calculate the length from the 2 8-byte words using
++	   conditional select to reduce branch mispredictions (it is unlikely
++	   strlen_asimd will be repeatedly called on strings with the same
++	   length).
++
++	   If the string is longer than 16 bytes, we align src so don't need
++	   further page cross checks, and process 16 bytes per iteration.
++
++	   If the page cross check fails, we read 16 bytes from an aligned
++	   address, remove any characters before the string, and continue
++	   in the main loop using aligned loads.  Since strings crossing a
++	   page in the first 16 bytes are rare (probability of
++	   16/MIN_PAGE_SIZE ~= 0.4%), this case does not need to be optimized.
++
++	   AArch64 systems have a minimum page size of 4k.  We don't bother
++	   checking for larger page sizes - the cost of setting up the correct
++	   page size is just not worth the extra gain from a small reduction in
++	   the cases taking the slow path.  Note that we only care about
++	   whether the first fetch, which may be misaligned, crosses a page
++	   boundary.  */
++
++ENTRY_ALIGN (__strlen_asimd, 6)
++	DELOUSE (0)
++	DELOUSE (1)
++	and	tmp1, srcin, MIN_PAGE_SIZE - 1
++	cmp	tmp1, MIN_PAGE_SIZE - 16
++	b.gt	L(page_cross)
++	ldr	dataq, [srcin]
++#ifdef __AARCH64EB__
++	rev64	datav.16b, datav.16b
++#endif
++
++	/* Get the minimum value and keep going if it is not zero.  */
++	uminv	datab2, datav.16b
++	mov	tmp1, datav2.d[0]
++	cbnz	tmp1, L(main_loop_entry)
++
++	cmeq	datav.16b, datav.16b, #0
++	mov	data1, datav.d[0]
++	mov	data2, datav.d[1]
++	cmp	data1, 0
++	csel	data1, data1, data2, ne
++	mov	len, 8
++	rev	data1, data1
++	clz	tmp1, data1
++	csel	len, xzr, len, ne
++	add	len, len, tmp1, lsr 3
++	ret
++
++L(main_loop_entry):
++	bic	src, srcin, 15
++
++L(main_loop):
++	ldr	dataq, [src, 16]!
++L(page_cross_entry):
++	/* Get the minimum value and keep going if it is not zero.  */
++	uminv	datab2, datav.16b
++	mov	tmp1, datav2.d[0]
++	cbnz	tmp1, L(main_loop)
++
++L(tail):
++#ifdef __AARCH64EB__
++	rev64	datav.16b, datav.16b
++#endif
++	/* Set te NULL byte as 0xff and the rest as 0x00, move the data into a
++	   pair of scalars and then compute the length from the earliest NULL
++	   byte.  */
++	cmeq	datav.16b, datav.16b, #0
++	mov	data1, datav.d[0]
++	mov	data2, datav.d[1]
++	cmp	data1, 0
++	csel	data1, data1, data2, ne
++	sub	len, src, srcin
++	rev	data1, data1
++	add	tmp2, len, 8
++	clz	tmp1, data1
++	csel	len, len, tmp2, ne
++	add	len, len, tmp1, lsr 3
++	ret
++
++	/* Load 16 bytes from [srcin & ~15] and force the bytes that precede
++	   srcin to 0xff, so we ignore any NUL bytes before the string.
++	   Then continue in the aligned loop.  */
++L(page_cross):
++	mov	tmp3, 63
++	bic	src, srcin, 15
++	and	tmp1, srcin, 7
++	ands	tmp2, srcin, 8
++	ldr	dataq, [src]
++	lsl	tmp1, tmp1, 3
++	csel	tmp2, tmp2, tmp1, eq
++	csel	tmp1, tmp1, tmp3, eq
++	mov	tmp4, -1
++#ifdef __AARCH64EB__
++	/* Big-endian.  Early bytes are at MSB.  */
++	lsr	tmp1, tmp4, tmp1
++	lsr	tmp2, tmp4, tmp2
++#else
++	/* Little-endian.  Early bytes are at LSB.  */
++	lsl	tmp1, tmp4, tmp1
++	lsl	tmp2, tmp4, tmp2
++#endif
++	mov	datav2.d[0], tmp1
++	mov	datav2.d[1], tmp2
++	orn	datav.16b, datav.16b, datav2.16b
++	b	L(page_cross_entry)
++END (__strlen_asimd)
++weak_alias (__strlen_asimd, strlen)
++libc_hidden_builtin_def (strlen)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strncmp.S glibc-2.17-c758a686/sysdeps/aarch64/strncmp.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strncmp.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strncmp.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,289 @@
++/* Copyright (C) 2013-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++/* Parameters and result.  */
++#define src1		x0
++#define src2		x1
++#define limit		x2
++#define result		x0
++
++/* Internal variables.  */
++#define data1		x3
++#define data1w		w3
++#define data2		x4
++#define data2w		w4
++#define has_nul		x5
++#define diff		x6
++#define syndrome	x7
++#define tmp1		x8
++#define tmp2		x9
++#define tmp3		x10
++#define zeroones	x11
++#define pos		x12
++#define limit_wd	x13
++#define mask		x14
++#define endloop		x15
++#define count		mask
++
++ENTRY_ALIGN_AND_PAD (strncmp, 6, 7)
++	DELOUSE (0)
++	DELOUSE (1)
++	DELOUSE (2)
++	cbz	limit, L(ret0)
++	eor	tmp1, src1, src2
++	mov	zeroones, #REP8_01
++	tst	tmp1, #7
++	and	count, src1, #7
++	b.ne	L(misaligned8)
++	cbnz	count, L(mutual_align)
++	/* Calculate the number of full and partial words -1.  */
++	sub	limit_wd, limit, #1	/* limit != 0, so no underflow.  */
++	lsr	limit_wd, limit_wd, #3	/* Convert to Dwords.  */
++
++	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	   can be done in parallel across the entire word.  */
++	/* Start of performance-critical section  -- one 64B cache line.  */
++L(loop_aligned):
++	ldr	data1, [src1], #8
++	ldr	data2, [src2], #8
++L(start_realigned):
++	subs	limit_wd, limit_wd, #1
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	csinv	endloop, diff, xzr, pl	/* Last Dword or differences.  */
++	bics	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	ccmp	endloop, #0, #0, eq
++	b.ne	L(check_limit)
++
++	ldr	data1, [src1], #8
++	ldr	data2, [src2], #8
++	subs	limit_wd, limit_wd, #1
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	csinv	endloop, diff, xzr, pl	/* Last Dword or differences.  */
++	bics	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	ccmp	endloop, #0, #0, eq
++	b.eq	L(loop_aligned)
++	/* End of performance-critical section  -- one 64B cache line.  */
++L(check_limit):
++	/* Not reached the limit, must have found the end or a diff.  */
++	tbz	limit_wd, #63, L(not_limit)
++
++	/* Limit % 8 == 0 => all bytes significant.  */
++	ands	limit, limit, #7
++	b.eq	L(not_limit)
++
++	lsl	limit, limit, #3	/* Bits -> bytes.  */
++	mov	mask, #~0
++#ifdef __AARCH64EB__
++	lsr	mask, mask, limit
++#else
++	lsl	mask, mask, limit
++#endif
++	bic	data1, data1, mask
++	bic	data2, data2, mask
++
++	/* Make sure that the NUL byte is marked in the syndrome.  */
++	orr	has_nul, has_nul, mask
++
++L(not_limit):
++	orr	syndrome, diff, has_nul
++
++#ifndef	__AARCH64EB__
++	rev	syndrome, syndrome
++	rev	data1, data1
++	/* The MS-non-zero bit of the syndrome marks either the first bit
++	   that is different, or the top bit of the first zero byte.
++	   Shifting left now will bring the critical information into the
++	   top bits.  */
++	clz	pos, syndrome
++	rev	data2, data2
++	lsl	data1, data1, pos
++	lsl	data2, data2, pos
++	/* But we need to zero-extend (char is unsigned) the value and then
++	   perform a signed 32-bit subtraction.  */
++	lsr	data1, data1, #56
++	sub	result, data1, data2, lsr #56
++	RET
++#else
++	/* For big-endian we cannot use the trick with the syndrome value
++	   as carry-propagation can corrupt the upper bits if the trailing
++	   bytes in the string contain 0x01.  */
++	/* However, if there is no NUL byte in the dword, we can generate
++	   the result directly.  We can't just subtract the bytes as the
++	   MSB might be significant.  */
++	cbnz	has_nul, 1f
++	cmp	data1, data2
++	cset	result, ne
++	cneg	result, result, lo
++	RET
++1:
++	/* Re-compute the NUL-byte detection, using a byte-reversed value.  */
++	rev	tmp3, data1
++	sub	tmp1, tmp3, zeroones
++	orr	tmp2, tmp3, #REP8_7f
++	bic	has_nul, tmp1, tmp2
++	rev	has_nul, has_nul
++	orr	syndrome, diff, has_nul
++	clz	pos, syndrome
++	/* The MS-non-zero bit of the syndrome marks either the first bit
++	   that is different, or the top bit of the first zero byte.
++	   Shifting left now will bring the critical information into the
++	   top bits.  */
++	lsl	data1, data1, pos
++	lsl	data2, data2, pos
++	/* But we need to zero-extend (char is unsigned) the value and then
++	   perform a signed 32-bit subtraction.  */
++	lsr	data1, data1, #56
++	sub	result, data1, data2, lsr #56
++	RET
++#endif
++
++L(mutual_align):
++	/* Sources are mutually aligned, but are not currently at an
++	   alignment boundary.  Round down the addresses and then mask off
++	   the bytes that precede the start point.
++	   We also need to adjust the limit calculations, but without
++	   overflowing if the limit is near ULONG_MAX.  */
++	bic	src1, src1, #7
++	bic	src2, src2, #7
++	ldr	data1, [src1], #8
++	neg	tmp3, count, lsl #3	/* 64 - bits(bytes beyond align). */
++	ldr	data2, [src2], #8
++	mov	tmp2, #~0
++	sub	limit_wd, limit, #1	/* limit != 0, so no underflow.  */
++#ifdef __AARCH64EB__
++	/* Big-endian.  Early bytes are at MSB.  */
++	lsl	tmp2, tmp2, tmp3	/* Shift (count & 63).  */
++#else
++	/* Little-endian.  Early bytes are at LSB.  */
++	lsr	tmp2, tmp2, tmp3	/* Shift (count & 63).  */
++#endif
++	and	tmp3, limit_wd, #7
++	lsr	limit_wd, limit_wd, #3
++	/* Adjust the limit. Only low 3 bits used, so overflow irrelevant.  */
++	add	limit, limit, count
++	add	tmp3, tmp3, count
++	orr	data1, data1, tmp2
++	orr	data2, data2, tmp2
++	add	limit_wd, limit_wd, tmp3, lsr #3
++	b	L(start_realigned)
++
++	.p2align 6
++	/* Don't bother with dwords for up to 16 bytes.  */
++L(misaligned8):
++	cmp	limit, #16
++	b.hs	L(try_misaligned_words)
++
++L(byte_loop):
++	/* Perhaps we can do better than this.  */
++	ldrb	data1w, [src1], #1
++	ldrb	data2w, [src2], #1
++	subs	limit, limit, #1
++	ccmp	data1w, #1, #0, hi	/* NZCV = 0b0000.  */
++	ccmp	data1w, data2w, #0, cs	/* NZCV = 0b0000.  */
++	b.ne	L(done)
++
++	ldrb	data1w, [src1], #1
++	ldrb	data2w, [src2], #1
++	subs	limit, limit, #1
++	ccmp	data1w, #1, #0, hi	/* NZCV = 0b0000.  */
++	ccmp	data1w, data2w, #0, cs	/* NZCV = 0b0000.  */
++	b.eq	L(byte_loop)
++	b L(done)
++	/* Align the SRC1 to a dword by doing a bytewise compare and then do
++	   the dword loop.  */
++L(try_misaligned_words):
++	lsr	limit_wd, limit, #3
++	cbz	count, L(do_misaligned)
++
++	neg	count, count
++	and	count, count, #7
++	sub	limit, limit, count
++	lsr	limit_wd, limit, #3
++
++L(page_end_loop):
++	ldrb	data1w, [src1], #1
++	ldrb	data2w, [src2], #1
++	cmp	data1w, #1
++	ccmp	data1w, data2w, #0, cs	/* NZCV = 0b0000.  */
++	b.ne	L(done)
++	subs	count, count, #1
++	b.hi	L(page_end_loop)
++
++L(do_misaligned):
++	/* Prepare ourselves for the next page crossing.  Unlike the aligned
++	   loop, we fetch 1 less dword because we risk crossing bounds on
++	   SRC2.  */
++	mov	count, #8
++	subs	limit_wd, limit_wd, #1
++	b.lo	L(done_loop)
++L(loop_misaligned):
++	and	tmp2, src2, #0xff8
++	eor	tmp2, tmp2, #0xff8
++	cbz	tmp2, L(page_end_loop)
++
++	ldr	data1, [src1], #8
++	ldr	data2, [src2], #8
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	bics	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	ccmp	diff, #0, #0, eq
++	b.ne	L(not_limit)
++	subs	limit_wd, limit_wd, #1
++	b.pl	L(loop_misaligned)
++
++L(done_loop):
++	/* We found a difference or a NULL before the limit was reached.  */
++	and	limit, limit, #7
++	cbz	limit, L(not_limit)
++	/* Read the last word.  */
++	sub	src1, src1, 8
++	sub	src2, src2, 8
++	ldr	data1, [src1, limit]
++	ldr	data2, [src2, limit]
++	sub	tmp1, data1, zeroones
++	orr	tmp2, data1, #REP8_7f
++	eor	diff, data1, data2	/* Non-zero if differences found.  */
++	bics	has_nul, tmp1, tmp2	/* Non-zero if NUL terminator.  */
++	ccmp	diff, #0, #0, eq
++	b.ne	L(not_limit)
++
++L(ret0):
++	mov	result, #0
++	RET
++L(done):
++	sub	result, data1, data2
++	RET
++END (strncmp)
++libc_hidden_builtin_def (strncmp)
+\ 文件尾没有 newline 字符
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strnlen.S glibc-2.17-c758a686/sysdeps/aarch64/strnlen.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strnlen.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strnlen.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,165 @@
++/* strnlen - calculate the length of a string with limit.
++
++   Copyright (C) 2013-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define len		x0
++#define limit		x1
++
++/* Locals and temporaries.  */
++#define src		x2
++#define data1		x3
++#define data2		x4
++#define data2a		x5
++#define has_nul1	x6
++#define has_nul2	x7
++#define tmp1		x8
++#define tmp2		x9
++#define tmp3		x10
++#define tmp4		x11
++#define zeroones	x12
++#define pos		x13
++#define limit_wd	x14
++
++/* NEON register */
++#define dataq		q2
++#define datav		v2
++#define datab2		b3
++#define dataq2		q3
++#define datav2		v3
++
++#define REP8_01 0x0101010101010101
++#define REP8_7f 0x7f7f7f7f7f7f7f7f
++#define REP8_80 0x8080808080808080
++
++ENTRY_ALIGN_AND_PAD (__strnlen, 6, 9)
++	DELOUSE (0)
++	DELOUSE (1)
++	DELOUSE (2)
++	cbz	limit, L(hit_limit)
++	mov	zeroones, #REP8_01
++	bic	src, srcin, #15
++	ands	tmp1, srcin, #15
++	b.ne	L(misaligned)
++	/* Calculate the number of full and partial words -1.  */
++	sub	limit_wd, limit, #1	/* Limit != 0, so no underflow.  */
++	lsr	limit_wd, limit_wd, #4	/* Convert to Qwords.  */
++
++	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
++	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
++	   can be done in parallel across the entire word.  */
++	/* The inner loop deals with two Dwords at a time.  This has a
++	   slightly higher start-up cost, but we should win quite quickly,
++	   especially on cores with a high number of issue slots per
++	   cycle, as we get much better parallelism out of the operations.  */
++
++	/* Start of critial section -- keep to one 64Byte cache line.  */
++L(loop):
++	ldr	dataq, [src], #16
++L(realigned):
++	uminv	datab2, datav.16b
++	mov	tmp1, datav2.d[0]
++	subs	limit_wd, limit_wd, #1
++	ccmp	tmp1, #0, #4, pl	/* NZCV = 0000  */
++	b.ne	L(loop)
++	/* End of critical section -- keep to one 64Byte cache line.  */
++
++	cbnz	tmp1, L(hit_limit)	/* No null in final Qword.  */
++
++	/* We know there's a null in the final Qword.  The easiest thing
++	   to do now is work out the length of the string and return
++	   MIN (len, limit).  */
++
++#ifdef __AARCH64EB__
++	rev64	datav.16b, datav.16b
++#endif
++	/* Set te NULL byte as 0xff and the rest as 0x00, move the data into a
++	   pair of scalars and then compute the length from the earliest NULL
++	   byte.  */
++
++	cmeq	datav.16b, datav.16b, #0
++	mov	data1, datav.d[0]
++	mov	data2, datav.d[1]
++	cmp	data1, 0
++	csel	data1, data1, data2, ne
++	sub	len, src, srcin
++	sub	len, len, #16
++	rev	data1, data1
++	add	tmp2, len, 8
++	clz	tmp1, data1
++	csel	len, len, tmp2, ne
++	add	len, len, tmp1, lsr 3
++	cmp	len, limit
++	csel	len, len, limit, ls		/* Return the lower value.  */
++	RET
++
++L(misaligned):
++	/* Deal with a partial first word.
++	   We're doing two things in parallel here;
++	   1) Calculate the number of words (but avoiding overflow if
++	      limit is near ULONG_MAX) - to do this we need to work out
++	      limit + tmp1 - 1 as a 65-bit value before shifting it;
++	   2) Load and mask the initial data words - we force the bytes
++	      before the ones we are interested in to 0xff - this ensures
++	      early bytes will not hit any zero detection.  */
++	sub	limit_wd, limit, #1
++	neg	tmp4, tmp1
++	cmp	tmp1, #8
++
++	and	tmp3, limit_wd, #15
++	lsr	limit_wd, limit_wd, #4
++	mov	tmp2, #~0
++
++	ldp	data1, data2, [src], #16
++	lsl	tmp4, tmp4, #3		/* Bytes beyond alignment -> bits.  */
++	add	tmp3, tmp3, tmp1
++
++#ifdef __AARCH64EB__
++	/* Big-endian.  Early bytes are at MSB.  */
++	lsl	tmp2, tmp2, tmp4	/* Shift (tmp1 & 63).  */
++#else
++	/* Little-endian.  Early bytes are at LSB.  */
++	lsr	tmp2, tmp2, tmp4	/* Shift (tmp1 & 63).  */
++#endif
++	add	limit_wd, limit_wd, tmp3, lsr #4
++
++	orr	data1, data1, tmp2
++	orr	data2a, data2, tmp2
++
++	csinv	data1, data1, xzr, le
++	csel	data2, data2, data2a, le
++	mov	datav.d[0], data1
++	mov	datav.d[1], data2
++	b	L(realigned)
++
++L(hit_limit):
++	mov	len, limit
++	RET
++END (__strnlen)
++libc_hidden_def (__strnlen)
++weak_alias (__strnlen, strnlen)
++libc_hidden_def (strnlen)
+diff -Nur glibc-2.17-c758a686.orig/sysdeps/aarch64/strrchr.S glibc-2.17-c758a686/sysdeps/aarch64/strrchr.S
+--- glibc-2.17-c758a686.orig/sysdeps/aarch64/strrchr.S	1970-01-01 08:00:00.000000000 +0800
++++ glibc-2.17-c758a686/sysdeps/aarch64/strrchr.S	2020-03-03 10:22:19.263552599 +0800
+@@ -0,0 +1,166 @@
++/* strrchr: find the last instance of a character in a string.
++
++   Copyright (C) 2014-2019 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <port_aarch64.h>
++
++/* Assumptions:
++ *
++ * ARMv8-a, AArch64
++ * Neon Available.
++ */
++
++/* Arguments and results.  */
++#define srcin		x0
++#define chrin		w1
++
++#define result		x0
++
++#define src		x2
++#define	tmp1		x3
++#define wtmp2		w4
++#define tmp3		x5
++#define src_match	x6
++#define src_offset	x7
++#define const_m1	x8
++#define tmp4		x9
++#define nul_match	x10
++#define chr_match	x11
++
++#define vrepchr		v0
++#define vdata1		v1
++#define vdata2		v2
++#define vhas_nul1	v3
++#define vhas_nul2	v4
++#define vhas_chr1	v5
++#define vhas_chr2	v6
++#define vrepmask_0	v7
++#define vrepmask_c	v16
++#define vend1		v17
++#define vend2		v18
++
++/* Core algorithm.
++
++   For each 32-byte hunk we calculate a 64-bit syndrome value, with
++   two bits per byte (LSB is always in bits 0 and 1, for both big
++   and little-endian systems).  For each tuple, bit 0 is set iff
++   the relevant byte matched the requested character; bit 1 is set
++   iff the relevant byte matched the NUL end of string (we trigger
++   off bit0 for the special case of looking for NUL).  Since the bits
++   in the syndrome reflect exactly the order in which things occur
++   in the original string a count_trailing_zeros() operation will
++   identify exactly which byte is causing the termination, and why.  */
++
++ENTRY(strrchr)
++	DELOUSE (0)
++	cbz	x1, L(null_search)
++	/* Magic constant 0x40100401 to allow us to identify which lane
++	   matches the requested byte.  Magic constant 0x80200802 used
++	   similarly for NUL termination.  */
++	mov	wtmp2, #0x0401
++	movk	wtmp2, #0x4010, lsl #16
++	dup	vrepchr.16b, chrin
++	bic	src, srcin, #31		/* Work with aligned 32-byte hunks.  */
++	dup	vrepmask_c.4s, wtmp2
++	mov	src_offset, #0
++	ands	tmp1, srcin, #31
++	add	vrepmask_0.4s, vrepmask_c.4s, vrepmask_c.4s /* equiv: lsl #1 */
++	b.eq	L(aligned)
++
++	/* Input string is not 32-byte aligned.  Rather than forcing
++	   the padding bytes to a safe value, we calculate the syndrome
++	   for all the bytes, but then mask off those bits of the
++	   syndrome that are related to the padding.  */
++	ld1	{vdata1.16b, vdata2.16b}, [src], #32
++	neg	tmp1, tmp1
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	and	vhas_nul1.16b, vhas_nul1.16b, vrepmask_0.16b
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask_c.16b
++	and	vhas_nul2.16b, vhas_nul2.16b, vrepmask_0.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask_c.16b
++	addp	vhas_nul1.16b, vhas_nul1.16b, vhas_nul2.16b	// 256->128
++	addp	vhas_chr1.16b, vhas_chr1.16b, vhas_chr2.16b	// 256->128
++	addp	vhas_nul1.16b, vhas_nul1.16b, vhas_nul1.16b	// 128->64
++	addp	vhas_chr1.16b, vhas_chr1.16b, vhas_chr1.16b	// 128->64
++	mov	nul_match, vhas_nul1.2d[0]
++	lsl	tmp1, tmp1, #1
++	mov	const_m1, #~0
++	mov	chr_match, vhas_chr1.2d[0]
++	lsr	tmp3, const_m1, tmp1
++
++	bic	nul_match, nul_match, tmp3	// Mask padding bits.
++	bic	chr_match, chr_match, tmp3	// Mask padding bits.
++	cbnz	nul_match, L(tail)
++
++L(loop):
++	cmp	chr_match, #0
++	csel	src_match, src, src_match, ne
++	csel	src_offset, chr_match, src_offset, ne
++L(aligned):
++	ld1	{vdata1.16b, vdata2.16b}, [src], #32
++	cmeq	vhas_nul1.16b, vdata1.16b, #0
++	cmeq	vhas_chr1.16b, vdata1.16b, vrepchr.16b
++	cmeq	vhas_nul2.16b, vdata2.16b, #0
++	cmeq	vhas_chr2.16b, vdata2.16b, vrepchr.16b
++	addp	vend1.16b, vhas_nul1.16b, vhas_nul2.16b	// 256->128
++	and	vhas_chr1.16b, vhas_chr1.16b, vrepmask_c.16b
++	and	vhas_chr2.16b, vhas_chr2.16b, vrepmask_c.16b
++	addp	vhas_chr1.16b, vhas_chr1.16b, vhas_chr2.16b	// 256->128
++	addp	vend1.16b, vend1.16b, vend1.16b	// 128->64
++	addp	vhas_chr1.16b, vhas_chr1.16b, vhas_chr1.16b	// 128->64
++	mov	nul_match, vend1.2d[0]
++	mov	chr_match, vhas_chr1.2d[0]
++	cbz	nul_match, L(loop)
++
++	and	vhas_nul1.16b, vhas_nul1.16b, vrepmask_0.16b
++	and	vhas_nul2.16b, vhas_nul2.16b, vrepmask_0.16b
++	addp	vhas_nul1.16b, vhas_nul1.16b, vhas_nul2.16b
++	addp	vhas_nul1.16b, vhas_nul1.16b, vhas_nul1.16b
++	mov	nul_match, vhas_nul1.2d[0]
++
++L(tail):
++	/* Work out exactly where the string ends.  */
++	sub	tmp4, nul_match, #1
++	eor	tmp4, tmp4, nul_match
++	ands	chr_match, chr_match, tmp4
++	/* And pick the values corresponding to the last match.  */
++	csel	src_match, src, src_match, ne
++	csel	src_offset, chr_match, src_offset, ne
++
++	/* Count down from the top of the syndrome to find the last match.  */
++	clz	tmp3, src_offset
++	/* Src_match points beyond the word containing the match, so we can
++	   simply subtract half the bit-offset into the syndrome.  Because
++	   we are counting down, we need to go back one more character.  */
++	add	tmp3, tmp3, #2
++	sub	result, src_match, tmp3, lsr #1
++	/* But if the syndrome shows no match was found, then return NULL.  */
++	cmp	src_offset, #0
++	csel	result, result, xzr, ne
++
++	ret
++L(null_search):
++	b	__strchrnul
++
++END(strrchr)
++weak_alias (strrchr, rindex)
++libc_hidden_builtin_def (strrchr)
