@@ -1,0 +1,30 @@
+From 1708786dcaf5b9a9535a9660c089a1fd13e22291 Mon Sep 17 00:00:00 2001
+From: Daizhiyuan <jerry.zhiyuan.dai@gmail.com>
+Date: Fri, 3 Apr 2020 15:26:02 +0800
+Subject: [PATCH 2/4] innobase: optimize cache line size
+
+---
+ storage/innobase/include/ut0counter.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/storage/innobase/include/ut0counter.h b/storage/innobase/include/ut0counter.h
+index 6b187ec..a18d193 100644
+--- a/storage/innobase/include/ut0counter.h
++++ b/storage/innobase/include/ut0counter.h
+@@ -32,11 +32,11 @@ Created 2012/04/12 by Sunny Bains
+ #include "os0thread.h"
+ 
+ /** CPU cache line size */
+-#ifdef __powerpc__
++#if defined( __powerpc__) || defined(__aarch64__)
+ #define CACHE_LINE_SIZE		128
+ #else
+ #define CACHE_LINE_SIZE		64
+-#endif /* __powerpc__ */
++#endif /* __powerpc__ && __aarch64__ */
+ 
+ /** Default number of slots to use in ib_counter_t */
+ #define IB_N_SLOTS		64
+-- 
+1.8.3.1
+

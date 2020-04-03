@@ -1,0 +1,36 @@
+From 0732ba75eaf42396b7f3532ac8cb9566cae5e90d Mon Sep 17 00:00:00 2001
+From: Daizhiyuan <jerry.zhiyuan.dai@gmail.com>
+Date: Fri, 3 Apr 2020 15:35:38 +0800
+Subject: [PATCH 4/4] add configure script
+
+---
+ configure.sh | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100755 configure.sh
+
+diff --git a/configure.sh b/configure.sh
+new file mode 100755
+index 0000000..0c95ab1
+--- /dev/null
++++ b/configure.sh
+@@ -0,0 +1,17 @@
++#!/bin/bash
++
++cmake -DCMAKE_INSTALL_PREFIX=/usr/local/mysql \
++-DMYSQL_DATADIR=/data/mysql \
++-DSYSCONFDIR=/etc \
++-DWITH_INNOBASE_STORAGE_ENGINE=1 \
++-DWITH_PARTITION_STORAGE_ENGINE=1 \
++-DWITH_FEDERATED_STORAGE_ENGINE=1 \
++-DWITH_BLACKHOLE_STORAGE_ENGINE=1 \
++-DWITH_MYISAM_STORAGE_ENGINE=1 \
++-DENABLED_LOCAL_INFILE=1 \
++-DENABLE_DTRACE=0 \
++-DDEFAULT_CHARSET=utf8mb4 \
++-DDEFAULT_COLLATION=utf8mb4_general_ci \
++-DWITH_EMBEDDED_SERVER=1 \
++-DDOWNLOAD_BOOST=1 \
++-DWITH_BOOST=/opt/mysql-5.7.27/boost/boost_1_59_0
+-- 
+1.8.3.1
+

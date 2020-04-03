@@ -1,0 +1,63 @@
+From d5435779ba4417c6ff73197c8a951285df8f47b1 Mon Sep 17 00:00:00 2001
+From: Daizhiyuan <jerry.zhiyuan.dai@gmail.com>
+Date: Fri, 3 Apr 2020 15:34:41 +0800
+Subject: [PATCH 3/4] fix: error: 'prctl' was not declared in this scope
+
+---
+ include/prctl.h | 31 +++++++++++++++++++++++++++++++
+ sql/mysqld.cc   |  1 +
+ 2 files changed, 32 insertions(+)
+ create mode 100644 include/prctl.h
+
+diff --git a/include/prctl.h b/include/prctl.h
+new file mode 100644
+index 0000000..dc23b67
+--- /dev/null
++++ b/include/prctl.h
+@@ -0,0 +1,31 @@
++/* Copyright (C) 1997, 1999 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#ifndef _SYS_PRCTL_H
++#define _SYS_PRCTL_H	1
++
++#include <features.h>
++#include <linux/prctl.h>  /*  The magic values come from here  */
++
++__BEGIN_DECLS
++
++/* Control process execution.  */
++extern int prctl (int __option, ...) __THROW;
++
++__END_DECLS
++
++#endif  /* sys/prctl.h */
+diff --git a/sql/mysqld.cc b/sql/mysqld.cc
+index 0c4ab0f..1cfacb8 100644
+--- a/sql/mysqld.cc
++++ b/sql/mysqld.cc
+@@ -15,6 +15,7 @@
+ 
+ #include "mysqld.h"
+ #include "mysqld_daemon.h"
++#include "prctl.h"
+ 
+ #include <vector>
+ #include <algorithm>
+-- 
+1.8.3.1
+
