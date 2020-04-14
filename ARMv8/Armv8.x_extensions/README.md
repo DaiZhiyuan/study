@@ -34,3 +34,16 @@
 - Additional crypto support (AArch32 and AArch64)
 - Generic counter scaling (AArch32 and AArch64)
 - Instructions to accelerate SHA512 and SHA3 (AArch64 only)
+
+# Armv8.x-A and the SBSA
+
+The `Server Base System Architecture (SBSA)`, provides `hardware requirements for servers`. 
+
+The SBSA ensures that `operating systems`, `hypervisors` and `firmware` operate correctly. 
+
+For servers, where a degree of `standardization is important`, the SBSA includes rules on which 
+extensions to the `architecture must be implemented`.
+
+The following table summarizes the SBSA requirements that relate to the Armv8.x-A extensions:
+
+![image](./Images/sbsa.png)
