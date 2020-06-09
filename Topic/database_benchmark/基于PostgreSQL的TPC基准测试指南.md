@@ -6,6 +6,7 @@
     - [3.1 配置Extra Packages for Enterprise Linux源](#31-配置extra-packages-for-enterprise-linux源)
     - [3.2 安装部署PostgreSQL](#32-安装部署postgresql)
     - [3.3 查看数据库基本情况](#33-查看数据库基本情况)
+    - [3.4 修改配置并登录验证](#34-修改配置并登录验证)
 - [4. TPC-C基准测试](#4-tpc-c基准测试)
     - [4.1 下载测试工具](#41-下载测试工具)
     - [4.2 安装编译依赖](#42-安装编译依赖)
@@ -101,6 +102,8 @@ Created symlink from /etc/systemd/system/multi-user.target.wants/postgresql.serv
 [root@bogon data]# su - postgres
 -bash-4.2$
 
+-bash-4.2$ psql
+
 postgres=# \conninfo
 以用户 "postgres" 的身份，通过套接字"/var/run/postgresql"在端口"5432"连接到数据库 "postgres"
 
@@ -124,7 +127,26 @@ postgres=# \du
 ----------+-----------------------------------+----------
  postgres | 超级用户, 建立角色, 建立 DB, 复制 | {}
 
+postgres=# ALTER USER postgres WITH PASSWORD 'abc123';
 postgres=# \q
+```
+
+## 3.4 修改配置并登录验证
+
+修改`/var/lib/pgsql/data/pg_hba.conf`中peer与ident改成trust。
+
+例如：`cat /var/lib/pgsql/data/pg_hba.conf`：
+``` 
+local   all             all                                     trust
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            trust
+# IPv6 local connections:
+host    all             all             ::1/128                 trust
+```
+登录验证：
+```
+[root@bogon ~]# psql -h 127.0.0.1 -U postgres -W
+Password for user postgres:
 ```
 
 # 4. TPC-C基准测试
