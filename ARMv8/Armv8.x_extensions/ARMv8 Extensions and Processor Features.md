@@ -31,8 +31,6 @@ sve	| ARMv8.2-SVE | Scalable Vector Extension (SVE)
 
 # ARM64 ELF hwcaps(exposed in AT_HWCAP)
 
-
-
 HWCAP_FP
 
     Functionality implied by ID_AA64PFR0_EL1.FP == 0b0000.
@@ -193,3 +191,69 @@ HWCAP_PACG
     ID_AA64ISAR1_EL1.GPI == 0b0001, as described by
     Documentation/arm64/pointer-authentication.txt.
 
+# DEMO
+
+hwcap.c
+```
+#include <stdio.h>
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+
+#define OPTIONS(flag) (hwcaps & flag?"\033[1;32;40msupport\033[0m":"\033[1;31;40mnonsupport\033[0m")
+
+int main(void)
+{
+        long hwcaps= getauxval(AT_HWCAP);
+
+
+        printf("   [cpuid] : Some CPU ID registers readable at user-level.                                  (%s)\n", OPTIONS(HWCAP_CPUID));
+        printf(" [atomics] : Large System Extensions.                                                       (%s)\n", OPTIONS(HWCAP_ATOMICS));
+        printf(" [evtstrm] : Generic timer is configured to generate 'events' at frequency of about 100KHz. (%s)\n", OPTIONS(HWCAP_EVTSTRM));
+        printf("    [fphp] : Half-precision floating point.                                                 (%s)\n", OPTIONS(HWCAP_FPHP));
+        printf("      [fp] : Single-precision and double-precision floating point.                          (%s)\n", OPTIONS(HWCAP_FP));
+        printf("   [jscvt] : Javascript-style double->int convert.                                          (%s)\n", OPTIONS(HWCAP_JSCVT));
+        printf("   [lrcpc] : Weaker release consistency.                                                    (%s)\n", OPTIONS(HWCAP_LRCPC));
+        printf("   [dcpop] : Data cache clean to Point of Persistence.                                      (%s)\n", OPTIONS(HWCAP_DCPOP));
+        printf("   [crc32] : CRC32/CRC32C instructions.                                                     (%s)\n", OPTIONS(HWCAP_CRC32));
+        printf("    [sha1] : SHA-1 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA1));
+        printf("    [sha2] : SHA-2 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA2));
+        printf("    [sha3] : SHA-3 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA3));
+        printf("  [sha512] : SHA512 instructions.                                                           (%s)\n", OPTIONS(HWCAP_SHA512));
+        printf("     [aes] : AES instructions.                                                              (%s)\n", OPTIONS(HWCAP_AES));
+        printf("     [sm3] : SM3 instructions.                                                              (%s)\n", OPTIONS(HWCAP_SM3));
+        printf("     [sm4] : SM4 instructions.                                                              (%s)\n", OPTIONS(HWCAP_SM4));
+        printf("   [asimd] : Advanced single-instruction-multiple-data.                                     (%s)\n", OPTIONS(HWCAP_ASIMD));
+        printf("   [pmull] : Polynomial Multiply Long instructions.                                         (%s)\n", OPTIONS(HWCAP_PMULL));
+        printf(" [asimddp] : SIMD Dot Product.                                                              (%s)\n", OPTIONS(HWCAP_ASIMDDP));
+        printf("[asimdrdm] : Rounding Double Multiply Accumulate/Subtract.                                  (%s)\n", OPTIONS(HWCAP_ASIMDRDM));
+        printf("     [sve] : Scalable Vector Extension.                                                     (%s)\n", OPTIONS(HWCAP_SVE));
+
+        return 0;
+}
+```
+
+```
+[root@jerrydai ~]# gcc hwcap.c -o cpu_features
+[root@jerrydai ~]# ./cpu_features
+   [cpuid] : Some CPU ID registers readable at user-level.                                  (support)
+ [atomics] : Large System Extensions.                                                       (nonsupport)
+ [evtstrm] : Generic timer is configured to generate 'events' at frequency of about 100KHz. (support)
+    [fphp] : Half-precision floating point.                                                 (nonsupport)
+      [fp] : Single-precision and double-precision floating point.                          (support)
+   [jscvt] : Javascript-style double->int convert.                                          (nonsupport)
+   [lrcpc] : Weaker release consistency.                                                    (nonsupport)
+   [dcpop] : Data cache clean to Point of Persistence.                                      (nonsupport)
+   [crc32] : CRC32/CRC32C instructions.                                                     (support)
+    [sha1] : SHA-1 instructions.                                                            (nonsupport)
+    [sha2] : SHA-2 instructions.                                                            (nonsupport)
+    [sha3] : SHA-3 instructions.                                                            (nonsupport)
+  [sha512] : SHA512 instructions.                                                           (nonsupport)
+     [aes] : AES instructions.                                                              (nonsupport)
+     [sm3] : SM3 instructions.                                                              (nonsupport)
+     [sm4] : SM4 instructions.                                                              (nonsupport)
+   [asimd] : Advanced single-instruction-multiple-data.                                     (support)
+   [pmull] : Polynomial Multiply Long instructions.                                         (nonsupport)
+ [asimddp] : SIMD Dot Product.                                                              (nonsupport)
+[asimdrdm] : Rounding Double Multiply Accumulate/Subtract.                                  (nonsupport)
+     [sve] : Scalable Vector Extension.                                                     (nonsupport)
+```
