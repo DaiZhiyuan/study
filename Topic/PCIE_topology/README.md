@@ -118,9 +118,7 @@ do
 done
 [root@jerrydai ~]# ./show_pci_lane.sh
 Host Bridge:
- Speed 8GT/s Width x8
- Speed 8GT/s Width x8
+ Speed 8GT/s Width x16
  Speed 8GT/s Width x1
- Speed 8GT/s Width x8
- Speed 8GT/s Width x8
+ Speed 8GT/s Width x16
 ```
