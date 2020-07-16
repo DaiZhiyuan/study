@@ -28,7 +28,7 @@ yum install gnuplot
 git clone https://github.com/Rovanion/iozone-results-comparator.git
 yum install scipy python-matplotlib
 ./iozone_results_comparator.py --baseline /opt/iozone_ext4.output --set1 /opt/iozone_xfs.output
-firefox html_out/index.htmlW
+firefox html_out/index.html
 ```
 
 ![images](./summary.png)
