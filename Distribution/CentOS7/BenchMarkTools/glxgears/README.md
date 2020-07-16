@@ -10,14 +10,12 @@ GLX gears is a popular OpenGL test that is part of the “glx-utils” package.
 
 2. run
 ```
-[root@jerrydai ~]# vbank_mode=0 glxgears
-391 frames in 5.0 seconds = 78.144 FPS
-434 frames in 5.0 seconds = 86.660 FPS
-437 frames in 5.0 seconds = 87.253 FPS
-436 frames in 5.0 seconds = 87.034 FPS
-436 frames in 5.0 seconds = 87.041 FPS
-428 frames in 5.0 seconds = 85.451 FPS
-417 frames in 5.0 seconds = 83.234 FPS
-434 frames in 5.0 seconds = 86.753 FPS
-......
+[root@jerrydai ~]# vblank_mode=0 glxgears
+ATTENTION: default value of option vblank_mode overridden by environment.
+407 frames in 5.0 seconds = 81.371 FPS
+420 frames in 5.0 seconds = 83.878 FPS
+415 frames in 5.0 seconds = 82.920 FPS
+426 frames in 5.0 seconds = 85.118 FPS
+430 frames in 5.0 seconds = 85.819 FPS
+
 ```
