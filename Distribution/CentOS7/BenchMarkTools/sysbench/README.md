@@ -232,6 +232,46 @@ Threads fairness:
 
 ## mutex - Mutex performance test
 
+1. help
+```
+[root@jerrydai ~]# sysbench --test=mutex help
+sysbench 0.4.12.5:  multi-threaded system evaluation benchmark
+
+mutex options:
+  --mutex-num=N        total size of mutex array [4096]
+  --mutex-locks=N      number of mutex locks to do per thread [50000]
+  --mutex-loops=N      number of empty loops to do inside mutex lock [10000]
+```
+2. run
+```
+[root@jerrydai ~]# sysbench --test=mutex --mutex-num=4096 --mutex-locks=50000 --mutex-loops=10000 run
+sysbench 0.4.12.5:  multi-threaded system evaluation benchmark
+
+Running the test with following options:
+Number of threads: 1
+Random number generator seed is 0 and will be ignored
+
+
+Doing mutex performance test
+Threads started!
+Done.
+
+
+Test execution summary:
+    total time:                          0.0049s
+    total number of events:              1
+    total time taken by event execution: 0.0049
+    per-request statistics:
+         min:                                  4.93ms
+         avg:                                  4.93ms
+         max:                                  4.93ms
+         approx.  95 percentile:         10000000.00ms
+
+Threads fairness:
+    events (avg/stddev):           1.0000/0.00
+    execution time (avg/stddev):   0.0049/0.00
+```
+
 ## oltp - OLTP test
 
 Benchmark MySQL server Performance with Sysbench.
