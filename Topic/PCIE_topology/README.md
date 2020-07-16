@@ -96,7 +96,7 @@
         0c:0e.0  Bus: primary=0c, secondary=15, subordinate=15 <Downstream Port> [Port #14, Speed 8GT/s, Width x4]
 ```
 
-![avatar](./Images/pcie_topology_demo.png)
+![image](./Images/pcie_topology_demo.png)
 
 
 ```shell
