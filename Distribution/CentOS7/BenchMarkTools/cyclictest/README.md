@@ -17,7 +17,7 @@ High resolution timer test software.
 
 make_latency_plot.sh
 ```
-[root@localhost opt]# cat make_latency_plot.sh
+[root@jerrydai ~]# cat make_latency_plot.sh
 #!/bin/bash
 
 # 1. Run cyclictest
