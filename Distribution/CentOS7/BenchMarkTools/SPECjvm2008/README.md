@@ -217,4 +217,6 @@ serial|482.6
 startup|20.83
 sunflow|391.43
 xml|1413.85
-> Composite result: 373.89 SPECjvm2008 Base ops/m
+
+> Composite result: 373.89
+
