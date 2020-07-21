@@ -249,3 +249,128 @@ UUID=53af9761-1ff5-4f3d-829a-509cbe861ea4 /boot           xfs     defaults,noati
 /dev/mapper/centos_centos7u5-home /home                   xfs     defaults,noatime,nodiratime,nobarrier 0 0
 /dev/mapper/centos_centos7u5-swap swap                    swap    defaults        0 0
 ```
+
+## tools
+
+
+- `cat /etc/profile.d/system-info.sh`
+```
+[mysql@jerrydai ~]$ cat /etc/profile.d/system-info.sh
+#/bin/bash
+
+# Welcome
+welcome=$(uname -r)
+
+# Memory
+memory_total=$(free -m | awk '/Mem:/ { printf($2)}')
+if [ $memory_total -gt 0 ]
+then
+    memory_usage=$(free -m | awk '/Mem:/ { printf("%3.1f%%", $3/$2*100)}')
+else
+    memory_usage=0.0%
+fi
+
+# Swap memory
+swap_total=$(free -m | awk '/Swap:/ { printf($2)}')
+if [ $swap_total -gt 0 ]
+then
+    swap_mem=$(free -m | awk '/Swap:/ { printf("%3.1f%%", $3/$2*100)}')
+else
+    swap_mem=0.0%
+fi
+
+# Usage
+usageof=$(df -h / | awk '/\// {print $(NF-1)}')
+
+# System load
+load_average=$(awk '{print $1}' /proc/loadavg)
+
+# WHO I AM
+whoiam=$(whoami)
+
+# Time
+time_cur=$(date)
+
+# Processes
+processes=$(ps aux | wc -l)
+
+# Users
+user_num=$(users | wc -w)
+
+# Ip address
+ip_pre=$(/sbin/ip a|grep inet|grep -v 127.0.0.1|grep -v inet6 | awk '{print $2}' | head -1)
+ip_address=${ip_pre%/*}
+
+echo -e "\n"
+echo -e "Welcome to $welcome\n"
+echo -e "System information as of time: \t$time_cur\n"
+echo -e "System load: \t\033[0;33;40m$load_average\033[0m"
+echo -e "Processes: \t$processes"
+echo -e "Memory used: \t$memory_usage"
+echo -e "Swap used: \t$swap_mem"
+echo -e "Usage On: \t$usageof"
+echo -e "IP address: \t$ip_address"
+echo -e "Users online: \t$user_num\n"
+if [ "$whoiam"=="root" ]
+then
+        echo -e "\n"
+else
+        echo -e "To run a command as administrator(user \"root\"),use \"sudo <command>\"."
+fi
+```
+- `cat hwcap.c`
+```
+#include <stdio.h>
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+
+#define OPTIONS(flag) (hwcaps & flag?"\033[1;32;40msupport\033[0m":"\033[1;31;40mnonsupport\033[0m")
+
+int main(void)
+{
+        long hwcaps= getauxval(AT_HWCAP);
+
+        printf("   [cpuid] : Some CPU ID registers readable at user-level.                                  (%s)\n", OPTIONS(HWCAP_CPUID));
+        printf(" [atomics] : Large System Extensions.                                                       (%s)\n", OPTIONS(HWCAP_ATOMICS));
+        printf(" [evtstrm] : Generic timer is configured to generate 'events' at frequency of about 100KHz. (%s)\n", OPTIONS(HWCAP_EVTSTRM));
+        printf("    [fphp] : Half-precision floating point.                                                 (%s)\n", OPTIONS(HWCAP_FPHP));
+        printf("      [fp] : Single-precision and double-precision floating point.                          (%s)\n", OPTIONS(HWCAP_FP));
+        printf("   [jscvt] : Javascript-style double->int convert.                                          (%s)\n", OPTIONS(HWCAP_JSCVT));
+        printf("   [lrcpc] : Weaker release consistency.                                                    (%s)\n", OPTIONS(HWCAP_LRCPC));
+        printf("   [dcpop] : Data cache clean to Point of Persistence.                                      (%s)\n", OPTIONS(HWCAP_DCPOP));
+        printf("   [crc32] : CRC32/CRC32C instructions.                                                     (%s)\n", OPTIONS(HWCAP_CRC32));
+        printf("    [sha1] : SHA-1 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA1));
+        printf("    [sha2] : SHA-2 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA2));
+        printf("    [sha3] : SHA-3 instructions.                                                            (%s)\n", OPTIONS(HWCAP_SHA3));
+        printf("  [sha512] : SHA512 instructions.                                                           (%s)\n", OPTIONS(HWCAP_SHA512));
+        printf("     [aes] : AES instructions.                                                              (%s)\n", OPTIONS(HWCAP_AES));
+        printf("     [sm3] : SM3 instructions.                                                              (%s)\n", OPTIONS(HWCAP_SM3));
+        printf("     [sm4] : SM4 instructions.                                                              (%s)\n", OPTIONS(HWCAP_SM4));
+        printf("   [asimd] : Advanced single-instruction-multiple-data.                                     (%s)\n", OPTIONS(HWCAP_ASIMD));
+        printf(" [asimdhp] : Advanced SIMD half-precision floating point.                                   (%s)\n", OPTIONS(HWCAP_ASIMDHP));
+        printf("   [pmull] : Polynomial Multiply Long instructions.                                         (%s)\n", OPTIONS(HWCAP_PMULL));
+        printf(" [asimddp] : SIMD Dot Product.                                                              (%s)\n", OPTIONS(HWCAP_ASIMDDP));
+        printf("[asimdrdm] : Rounding Double Multiply Accumulate/Subtract.                                  (%s)\n", OPTIONS(HWCAP_ASIMDRDM));
+        printf("     [sve] : Scalable Vector Extension.                                                     (%s)\n", OPTIONS(HWCAP_SVE));
+        printf("    [fcma] : Floating point complex number addition and multiplication.                     (%s)\n", OPTIONS(HWCAP_FCMA));
+
+        return 0;
+}
+```
+> gcc hwcap.c -o show_cpu_features
+
+- `cat show_pci_lanes`
+```
+#!/bin/bash
+
+root_port_list=""
+
+for bridge in `lspci -n | grep 0604 | awk '{print $1}'`; do
+    lspci -vvv  -s $bridge | grep "Root Port" 2>&1 > /dev/null  && root_port_list+="$bridge "
+done
+
+echo "Host Bridge:"
+for root_port in $root_port_list; do
+    lspci -vvv -s $root_port | grep 'LnkCap' | awk -F ',' '{print $2 $3}'
+done
+```
