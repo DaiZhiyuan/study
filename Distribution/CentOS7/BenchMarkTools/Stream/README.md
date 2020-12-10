@@ -3,6 +3,12 @@
 STREAM is the de facto industry standard benchmark
 for measuring sustained memory bandwidth.
 
+Name | Code
+---|---
+COPY | a[i] = b[i]
+SCALE | a[i] = s*b[i];
+ADD | a[i] = b[i]+c[i];
+TRIAD | a[i] = b[i]+s*c[i];
 
 ## 编译
 
