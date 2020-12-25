@@ -1,7 +1,7 @@
 <!-- TOC -->
 
 - [Performance: steal task to improve CPU utilization](#performance-steal-task-to-improve-cpu-utilization)
-    - [[PATCH v4 00/10] steal tasks to improve CPU utilization:](#patch-v4-0010-steal-tasks-to-improve-cpu-utilization)
+    - [[PATCH v4 00/10] steal tasks to improve CPU utilization](#patch-v4-0010-steal-tasks-to-improve-cpu-utilization)
     - [[PATCH v4 01/10] sched: Provide sparsemask, a reduced contention bitmap](#patch-v4-0110-sched-provide-sparsemask-a-reduced-contention-bitmap)
     - [[PATCH v4 02/10] sched/topology: Provide hooks to allocate data shared per LLC](#patch-v4-0210-schedtopology-provide-hooks-to-allocate-data-shared-per-llc)
     - [[PATCH v4 03/10] sched/topology: Provide cfs_overload_cpus bitmap](#patch-v4-0310-schedtopology-provide-cfs_overload_cpus-bitmap)
@@ -17,7 +17,7 @@
 
 # Performance: steal task to improve CPU utilization
 
-## [PATCH v4 00/10] steal tasks to improve CPU utilization:
+## [PATCH v4 00/10] steal tasks to improve CPU utilization
 
 ```patch
 When a CPU has no more CFS tasks to run, and idle_balance() fails to
