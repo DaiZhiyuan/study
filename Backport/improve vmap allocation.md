@@ -1325,7 +1325,7 @@ index cfea25be7754..a7f257540a05 100644
 
 ## [RFC PATCH 2/2] mm: add priority threshold to __purge_vmap_area_lazy()
 
-```
+```patch
 commit 763b218ddfaf ("mm: add preempt points into
 __purge_vmap_area_lazy()")
 
