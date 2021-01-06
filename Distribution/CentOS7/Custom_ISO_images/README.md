@@ -76,6 +76,8 @@ mkisofs
 /root/centos_tree
 ```
 
+> aarch64: genisoimage -V 'CentOS 7 aarch64' -R -J -T -graft-points -verbose -e images/efiboot.img -no-emul-boot -c boot.catalog -hide boot.catalog -o /root/centos_isos/CentOS-7-aarch64-Everything-1810-variant.iso /root/centos_tree
+
 post:
 ```
 #> isohybrid --uefi "/root/centos_isos/CentOS-7-x86_64-DVD-1512.iso"
