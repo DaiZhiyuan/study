@@ -70,7 +70,7 @@ Arm平台上最主流的两个开源`hypervisor`是：`Xen(standalone,Type1)`与
 
 `Non-Secure`与`Secure`的`Exception Levels (ELs)`，如下图所示：
 
-![image](./Images/EL3.png)
+![image](./Images/ELs.png)
 
 在图中，`Secure El2`用灰色表示是因为在`Secure`下对EL2的支持并不总是可用的。
 这将在`Secure virtualization`章节中讨论。
