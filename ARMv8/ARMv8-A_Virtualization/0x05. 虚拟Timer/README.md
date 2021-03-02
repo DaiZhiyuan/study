@@ -5,7 +5,7 @@ ARM体系结构包含`Generic Timer`，每个`processor`中都有一组标准的
 `comparators`的值等于或者小于`system count`时，`comparators`会产生中断。
 下图显示，我们可以看到系统中`Generic Timer`（橙色部分）`comparators`组件与`counter module`。
 
-![image](./Images/timers.png)
+![image](./Images/timer.png)
 
 下图显示一个例子，`hypervisor`调度两个`vCPU`：
 
