@@ -2,14 +2,14 @@
 
 下图展示了简化版的`Software stack`与`Exception Level`：
 
-![image](./Images/0x01.png)
+![image](./Images/0x1.png)
 
 你可以看到`standalone hypervisor(Type 1)`如何映射到`Arm Exectption Level`。
 `hypervisor`运行在`EL2`，`Virtual Machine(VMS)`运行在`EL0/1`。
 
 在`hosted hypervisor(Type 2)`的情况会有很多问题，如下图所示：
 
-![image](./Images/0x02.png)
+![image](./Images/0x2.png)
 
 传统上，`Kernel`运行在`EL1`，但是`virtualization controls`却在`EL2`。
 这意味着大多数`Host OS`位于`EL1`，`EL2`中运行着一些`stub code`以访问`virtualization controls`。
@@ -39,13 +39,13 @@ Host Application(El0) | 1 | 1
 
 您可以在下面的图中看到这些典型的设置：
 
-![image](./Images/0x03.png)
+![image](./Images/0x3.png)
 
 ## 6.2 Virtual address space
 
 下图显示了在引入`VHE`之前`EL0/EL1`的虚拟地址空间是什么样子：
 
-![image](./Images/0x04.png)
+![image](./Images/0x4.png)
 
 如`Memory Management`中所述，`EL0`与`EL1`有两个`region`。
 按照惯例，上方`region`称为`kernel space`，下方`region`称为`user space`。
@@ -60,7 +60,7 @@ Host Application(El0) | 1 | 1
 为了让`Host OS`在`EL2`高效的执行，我们需要在`EL2`添加一个`region`并让其支持`ASID`。
 通过设置`HCR_EL2.E2H`可以解决这些问题，如下图所示：
 
-![image](./Images/0x05.png)
+![image](./Images/0x5.png)
 
 在`EL0`中，`HCR_EL2.TGE`控制使用哪个虚拟地址空间：`EL1 space`还是`EL2 space`。
 使用哪个`space`取决于`Application`是在 `Host OS(TGE==1)`下运行，还是在`Guest OS(TGE==0)`下运行。
@@ -72,14 +72,14 @@ Host Application(El0) | 1 | 1
 
 想要在`EL2`上运行相同的二进制文件，我们需要从`EL1 registers`的访问`redirect`到等价的`EL2 registers`上。通过对`E2H`设置可以做到，`redirection`如图所示：
 
-![image](./Images/0x06.png)
+![image](./Images/0x6.png)
 
 然而，这种重定向给我们带来一个新的问题。
 `hypervisor`仍然需要访问真正的`_EL1 register`，以便它可以实现`task switch`。
 为了解决这个问题，引入了一组带有`_EL12`或`_EL02`后缀的新寄存器`alias`。
 当在`EL2`且`E2H==1`时，这里提供访问`EL1 register`进行`task switch`，如下图所示：
 
-![image](./Images/0x07.png)
+![image](./Images/0x7.png)
 
 ## 6.4 Exceptions
 
