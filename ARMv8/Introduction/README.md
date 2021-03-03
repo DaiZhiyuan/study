@@ -104,5 +104,5 @@ Caches | L1 i-cache: 8KB~64KB</br> L1 d-cache: 8KB~64KB</br>L2 cache: optional, 
 
 ### 1.7.3 What information will I find in each document?
 
-![image](./Images/0x03.png)
+![image](./Images/0x3.png)
 
