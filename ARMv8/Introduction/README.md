@@ -20,7 +20,7 @@ Arm架构有三个配置文件：`A, R and M`。
 
 当我们使用`architecture`术语时，我们指的是`functional specification`。
 在Arm架构中，我们指的是`processor`的`functional specification`。
-`architecture specification`是指处理器的行为方式，例如处理器具有的指令以及这些指令的功能。
+`architecture specification`是指处理器的行为方式，例如，处理器具有的指令以及这些指令的功能。
 
 
 您可以将`architecture`视为`hardware`和`software`之间的契约。
@@ -39,9 +39,9 @@ Arm架构有三个配置文件：`A, R and M`。
 - `Exception model`
     - 不同的特权级别
     - 异常的类型
-    - 异常发生或返回的机制
+    - 异常发生与异常返回的机制
 - `Memory model`
-    - 内存访问是如何排序
+    - 内存访问是如何排序的
     - 缓存的行为如何，以及软件何时需要必要的`explicit maintenance`。
 - `Debug, trace, and profiling`
     - 如何设置和触发断点
