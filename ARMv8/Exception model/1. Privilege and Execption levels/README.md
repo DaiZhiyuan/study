@@ -21,12 +21,12 @@ Armv8-A通过不同`privilege level`来实现这种拆分。
 
 ## 1.1 Types of privilege
 
-与`privilege`相关的主题有两大类。第一类是`memory system`中的权限，第二类是从访问处理器资源的观念上讨论权限。
+与`privilege`相关的主题有两大类。第一类是`memory system`中的权限，第二类是从访问处理器资源的观点上讨论权限。
 两者都受到当前`current exception level`的影响。
 
 ### 1.2 Memory privilege
 
-Armv8-A实现了`virtual memory system`，其中`Memory Management Unit (MMU)`允许软件对`memory region`分配`attributes`。这些`attributes`包括`read/write`权限，可以使用两个自由度对其进行配置。
+Armv8-A实现了`virtual memory system`，其中`Memory Management Unit (MMU)`允许软件对`memory region`分配`attributes`。这些`attributes`包括`read/write`权限，可以使用两个维度对其进行配置。
 这配置允许对`privileged`和`unprivileged`访问分别使用`access permissions`。
 
 处理器在`EL0`执行时，发起内存访问会根据`Unprivileged`进行权限检查。如果在`EL1`，`EL2`与`EL3`访问内存，将会检查`privileged`的访问权限。
@@ -54,8 +54,8 @@ Armv8-A处理器的`Configuration settings`是通过`System registers`。
 > `EL1`与`EL0`共享相同的`MMU`配置，控制MMU的`privileged code`运行在`EL1`上。因此，没有`SCTLR_EL0`，所有控制都从`EL1`访问该寄存器。其他的控制寄存器，通常遵循此模型。
 
 较高的`Exception level`可以访问控制较低级寄存器的特权。
-例如，如果需要`EL2`有权限访问`SCTLR_EL`。
+例如，如果需要`EL2`有权限访问`SCTLR_EL1`。
 
 在传统的操作系统中，`privileged Exception levels`通常控制只会控制自己的配置。
 然而，有时较高的异常级别需要访问较低的异常级别的寄存器。
-例如，实现虚拟化特性，上下文切换（读取和写入寄存器，作为保存和恢复操作的一部分），以及电源管理。
+例如，实现虚拟化特性，上下文切换（读取和写入寄存器，作为保存和恢复操作的一部分），以及电源管理等。
