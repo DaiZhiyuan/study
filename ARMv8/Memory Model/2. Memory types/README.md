@@ -86,8 +86,6 @@ ordering.
 对于`Device`类型的内存，正好相反。
 `Device`内存类型可能会有副作用。
 
-# 2. Describing the memory type
-
 例如，对设备的`FIFO`的读取通常会导致它前进到下一个数据块。
 这意味着对`FIFO`的访问次数很重要，因此处理器必须遵守程序指定的内容。
 
@@ -136,3 +134,18 @@ ordering.
 
 这个例子是极端的，不太可能发生在`Arm Cortex-A`处理器。
 然而，处理器通常不会区分所有类型或子类型，例如，可能处理器会以相同的方式处理`Device_GRE`和`Device_nGRE`。
+
+# 2. Describing the memory type
+
+内存类型不是直接编码到页表项(`translation table entry`)中。
+相反，页表项的索引字段`(index fidle)`会从`MAIR_ELx(Memory Attribute Indirection Register)`寄存器中选择`entry`。
+
+![image](./Images/0x5.png)
+
+所选的字段(`fidle`)将会确定内存类型(`memroy type`)和可缓存性(`cacheability`)信息。
+
+为什么要使用指向寄存器的索引，而不是直接将内存类型编码到转换表条目中？
+
+因为页表项中的`bit`位数是有限的。
+它需要`8bit`来编码存储器类型，但是只需要`3bit`就能索引`MAIR_ELx`。
+这使体系结构可以有效地使用表条目中的更少位。
