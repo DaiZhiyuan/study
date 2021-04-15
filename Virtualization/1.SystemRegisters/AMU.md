@@ -161,3 +161,129 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     undef_access 
 }
 ```
+# 3. Pointer authentication in AArch64 Linux
+
+`ARMv8.3`指针身份验证扩展，可用于减轻某些类型的攻击的原语，在这些类别中，攻击者可能破坏某些内存（例如堆栈）的内容。
+
+该扩展使用`Pointer Authentication Code (PAC)`来确定指针指向的数据是否已被恶意踹改。它供了五个单独的密钥来生成`PAC`:
+- 两个用于指令地址（APIAKey，APIBKey）
+- 两个用于数据地址（APDAKey，APDBKey）
+- 一个用于通用身份验证（APGAKey）
+
+
+```c
+#define REG_HIDDEN      (1 << 0) /* hidden from userspace and guest */
+#define REG_RAZ         (1 << 1) /* RAZ from userspace and guest */
+
+static unsigned int ptrauth_visibility(const struct kvm_vcpu *vcpu,
+            const struct sys_reg_desc *rd)
+{
+    return vcpu_has_ptrauth(vcpu) ? 0 : REG_HIDDEN;
+}
+
+/* Reset functions */
+static inline void reset_unknown(struct kvm_vcpu *vcpu,
+                 const struct sys_reg_desc *r)
+{
+    BUG_ON(!r->reg);
+    BUG_ON(r->reg >= NR_SYS_REGS);
+    __vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
+}
+
+static bool undef_access(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+             const struct sys_reg_desc *r)
+{
+    kvm_inject_undefined(vcpu);
+
+    return false;
+}
+
+#define __PTRAUTH_KEY(k)                        \
+    { SYS_DESC(SYS_## k), undef_access, reset_unknown, k,       \
+    .visibility = ptrauth_visibility}
+
+#define PTRAUTH_KEY(k)                          \
+    __PTRAUTH_KEY(k ## KEYLO_EL1),                  \
+    __PTRAUTH_KEY(k ## KEYHI_EL1)
+
+static const struct sys_reg_desc sys_reg_descs[] = {
+    PTRAUTH_KEY(APIA),
+    PTRAUTH_KEY(APIB),
+    PTRAUTH_KEY(APDA),
+    PTRAUTH_KEY(APDB),
+    PTRAUTH_KEY(APGA),
+};
+```
+宏展开后：
+```c
+{ 
+    .name = "SYS_APIAKEYLO_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((0) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((0) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((0) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((0) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((0) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown, 
+    APIAKEYLO_EL1, 
+    .visibility = ptrauth_visibility
+}, 
+{ 
+    .name = "SYS_APIAKEYHI_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown, 
+    APIAKEYHI_EL1, 
+    .visibility = ptrauth_visibility
+},
+{ 
+    .name = "SYS_APDAKEYLO_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown,
+    APDAKEYLO_EL1, 
+    .visibility = ptrauth_visibility
+}, 
+{ 
+    .name = "SYS_APDAKEYHI_EL1", .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 12) & 0xf), .
+    CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown, 
+    APDAKEYHI_EL1, 
+    .visibility = ptrauth_visibility
+},
+{ 
+    .name = "SYS_APGAKEYLO_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((0) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((0) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((0) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((0) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((0) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown, 
+    APGAKEYLO_EL1, 
+    .visibility = ptrauth_visibility}, 
+{ 
+    .name = "SYS_APGAKEYHI_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((1) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((1) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((1) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((1) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((3) << 8) | ((1) << 5))) >> 5) & 0x7), 
+    undef_access, 
+    reset_unknown, 
+    APGAKEYHI_EL1, 
+    .visibility = ptrauth_visibility
+}
+```
