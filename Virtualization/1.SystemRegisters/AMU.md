@@ -229,7 +229,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     .visibility = ptrauth_visibility
 }, 
 { 
-    .name = "SYS_APIAKEYHI_EL1", 
     .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 19) & 0x3), 
     .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 16) & 0x7), 
     .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((1) << 8) | ((1) << 5))) >> 12) & 0xf), 
@@ -240,7 +239,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     APIAKEYHI_EL1, 
     .visibility = ptrauth_visibility
 },
-{ 
+{
     .name = "SYS_APDAKEYLO_EL1", 
     .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 19) & 0x3), 
     .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((0) << 5))) >> 16) & 0x7), 
@@ -253,7 +252,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     .visibility = ptrauth_visibility
 }, 
 { 
-    .name = "SYS_APDAKEYHI_EL1", .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 19) & 0x3), 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 19) & 0x3), 
     .Op1 = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 16) & 0x7), 
     .CRn = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 12) & 0xf), .
     CRm = ((((((3) << 19) | ((0) << 16) | ((2) << 12) | ((2) << 8) | ((1) << 5))) >> 8) & 0xf), 
@@ -286,4 +285,150 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     APGAKEYHI_EL1, 
     .visibility = ptrauth_visibility
 }
+```
+# 4. Debug register
+
+```c
+static bool trap_bcr(struct kvm_vcpu *vcpu,
+             struct sys_reg_params *p,
+             const struct sys_reg_desc *rd)
+{
+    u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+
+    if (p->is_write)
+        reg_to_dbg(vcpu, p, rd, dbg_reg);
+    else
+        dbg_to_reg(vcpu, p, rd, dbg_reg);
+
+    return true;
+}
+
+static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+        const struct kvm_one_reg *reg, void __user *uaddr)
+{
+    __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+
+    if (copy_from_user(r, uaddr, KVM_REG_SIZE(reg->id)) != 0)
+        return -EFAULT;
+
+    return 0;
+}
+
+static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+    const struct kvm_one_reg *reg, void __user *uaddr)
+{
+    __u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
+
+    if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+        return -EFAULT;
+    return 0;
+}
+
+static void reset_bcr(struct kvm_vcpu *vcpu,
+              const struct sys_reg_desc *rd)
+{
+    vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = rd->val;
+}
+
+/*
+ * DBGBCR<n>_EL1: Debug Breakpoint Control Registers
+ * DBGBVR<n>_EL1: Debug Breakpoint Value Registers
+ * DBGWCR<n>_EL1: Debug Watchpoint Control Registers
+ * DBGWVR<n>_EL1: Debug Watchpoint Value Registers
+*/
+
+#define SYS_DBGBVRn_EL1(n)      sys_reg(2, 0, 0, n, 4) 
+#define SYS_DBGBCRn_EL1(n)      sys_reg(2, 0, 0, n, 5)
+#define SYS_DBGWVRn_EL1(n)      sys_reg(2, 0, 0, n, 6)
+#define SYS_DBGWCRn_EL1(n)      sys_reg(2, 0, 0, n, 7)
+
+#define DBG_BCR_BVR_WCR_WVR_EL1(n)                  \
+    { SYS_DESC(SYS_DBGBVRn_EL1(n)),                 \
+      trap_bvr, reset_bvr, 0, 0, get_bvr, set_bvr },        \
+    { SYS_DESC(SYS_DBGBCRn_EL1(n)),                 \
+      trap_bcr, reset_bcr, 0, 0, get_bcr, set_bcr },        \
+    { SYS_DESC(SYS_DBGWVRn_EL1(n)),                 \
+      trap_wvr, reset_wvr, 0, 0,  get_wvr, set_wvr },       \
+    { SYS_DESC(SYS_DBGWCRn_EL1(n)),                 \
+      trap_wcr, reset_wcr, 0, 0,  get_wcr, set_wcr }
+
+static const struct sys_reg_desc sys_reg_descs[] = {
+    DBG_BCR_BVR_WCR_WVR_EL1(0),
+/*   
+    DBG_BCR_BVR_WCR_WVR_EL1(1),
+    DBG_BCR_BVR_WCR_WVR_EL1(2),
+    DBG_BCR_BVR_WCR_WVR_EL1(3),
+    DBG_BCR_BVR_WCR_WVR_EL1(4),
+    DBG_BCR_BVR_WCR_WVR_EL1(5),
+    DBG_BCR_BVR_WCR_WVR_EL1(6),
+    DBG_BCR_BVR_WCR_WVR_EL1(7),
+    DBG_BCR_BVR_WCR_WVR_EL1(8),
+    DBG_BCR_BVR_WCR_WVR_EL1(9),
+    DBG_BCR_BVR_WCR_WVR_EL1(10),
+    DBG_BCR_BVR_WCR_WVR_EL1(11),
+    DBG_BCR_BVR_WCR_WVR_EL1(12),
+    DBG_BCR_BVR_WCR_WVR_EL1(13),
+    DBG_BCR_BVR_WCR_WVR_EL1(14),
+    DBG_BCR_BVR_WCR_WVR_EL1(15),
+*/
+};
+```
+宏展开后：
+```c
+{       
+    .name = "SYS_DBGBVRn_EL1(0)",
+    .Op0 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((4) << 5))) >> 19) & 0x3),
+    .Op1 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((4) << 5))) >> 16) & 0x7),
+    .CRn = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((4) << 5))) >> 12) & 0xf),
+    .CRm = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((4) << 5))) >> 8) & 0xf),
+    .Op2 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((4) << 5))) >> 5) & 0x7),
+    trap_bvr,
+    reset_bvr,
+    0,
+    0,
+    get_bvr,
+    set_bvr
+},
+{
+    .name = "SYS_DBGBCRn_EL1(0)",
+    .Op0 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((5) << 5))) >> 19) & 0x3),
+    .Op1 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((5) << 5))) >> 16) & 0x7),
+    .CRn = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((5) << 5))) >> 12) & 0xf),
+    .CRm = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((5) << 5))) >> 8) & 0xf),
+    .Op2 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((5) << 5))) >> 5) & 0x7),
+    trap_bcr,
+    reset_bcr,
+    0,
+    0,
+    get_bcr,
+    set_bcr
+},
+{
+    .name = "SYS_DBGWVRn_EL1(0)",
+    .Op0 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((6) << 5))) >> 19) & 0x3),
+    .Op1 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((6) << 5))) >> 16) & 0x7),
+    .CRn = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((6) << 5))) >> 12) & 0xf),
+    .CRm = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((6) << 5))) >> 8) & 0xf),
+    .Op2 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((6) << 5))) >> 5) & 0x7),
+    trap_wvr,
+    reset_wvr,
+    0,
+    0,
+    get_wvr,
+    set_wvr 
+},
+{
+    .name = "SYS_DBGWCRn_EL1(0)",
+    .Op0 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((7) << 5))) >> 19) & 0x3),
+    .Op1 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((7) << 5))) >> 16) & 0x7),
+    .CRn = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((7) << 5))) >> 12) & 0xf),
+    .CRm = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((7) << 5))) >> 8) & 0xf),
+    .Op2 = ((((((2) << 19) | ((0) << 16) | ((0) << 12) | ((0) << 8) | ((7) << 5))) >> 5) & 0x7),
+    trap_wcr,
+    reset_wcr,
+    0,
+    0,
+    get_wcr,
+    set_wcr
+},
 ```
