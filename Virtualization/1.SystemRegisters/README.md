@@ -604,3 +604,12 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     { SYS_DESC(SYS_CNTP_CVAL_EL0), access_arch_timer },
 };
 ```
+
+## TERM
+
+- `RAZ`：Read-As-Zero.
+- `RAO`：Read-As-Oned.
+- `WI`　：Writes Ignored.
+- `SBZP`:Should-Be-Zero-or-Preserved on writes.
+- `SBOP`:Should-Be-One-or-Preserved on writes.
+- `UNK`：unknown
