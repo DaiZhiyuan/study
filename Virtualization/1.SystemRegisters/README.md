@@ -432,3 +432,175 @@ static const struct sys_reg_desc sys_reg_descs[] = {
     set_wcr
 },
 ```
+# 5. Cpu feature ID register
+
+```c
+static unsigned int id_visibility(const struct kvm_vcpu *vcpu,
+                  const struct sys_reg_desc *r)
+{
+    u32 id = reg_to_encoding(r);
+
+    switch (id) {
+    case SYS_ID_AA64ZFR0_EL1:
+        if (!vcpu_has_sve(vcpu))
+            return REG_RAZ; // RAZ(Read-As-Zero)
+        break;
+    }
+
+    return 0;
+}
+
+static bool access_id_reg(struct kvm_vcpu *vcpu,
+              struct sys_reg_params *p,
+              const struct sys_reg_desc *r)
+{
+    bool raz = sysreg_visible_as_raz(vcpu, r);
+
+    return __access_id_reg(vcpu, p, r, raz);
+}
+
+static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+              const struct kvm_one_reg *reg, void __user *uaddr)
+{
+    bool raz = sysreg_visible_as_raz(vcpu, rd);
+
+    return __get_id_reg(vcpu, rd, uaddr, raz);
+}
+
+static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+              const struct kvm_one_reg *reg, void __user *uaddr)
+{
+    bool raz = sysreg_visible_as_raz(vcpu, rd);
+
+    return __set_id_reg(vcpu, rd, uaddr, raz);
+}
+
+#define SYS_ID_AA64DFR0_EL1     sys_reg(3, 0, 0, 5, 0)
+#define SYS_ID_AA64AFR0_EL1     sys_reg(3, 0, 0, 5, 4)
+
+/* sys_reg_desc initialiser for known cpufeature ID registers */
+#define ID_SANITISED(name) {            \
+    SYS_DESC(SYS_##name),           \
+    .access = access_id_reg,        \
+    .get_user = get_id_reg,         \
+    .set_user = set_id_reg,         \
+    .visibility = id_visibility,        \
+}
+
+/*
+ * sys_reg_desc initialiser for architecturally unallocated cpufeature ID
+ * register with encoding Op0=3, Op1=0, CRn=0, CRm=crm, Op2=op2
+ * (1 <= crm < 8, 0 <= Op2 < 8).
+ */
+#define ID_UNALLOCATED(crm, op2) {          \
+    Op0(3), Op1(0), CRn(0), CRm(crm), Op2(op2), \
+    .access = access_raz_id_reg,            \
+    .get_user = get_raz_id_reg,         \
+    .set_user = set_raz_id_reg,         \
+}
+
+/*
+ * sys_reg_desc initialiser for known ID registers that we hide from guests.
+ * For now, these are exposed just like unallocated ID regs: they appear
+ * RAZ for the guest.
+ */
+#define ID_HIDDEN(name) {           \
+    SYS_DESC(SYS_##name),           \
+    .access = access_raz_id_reg,        \
+    .get_user = get_raz_id_reg,     \
+    .set_user = set_raz_id_reg,     \
+}
+
+static const struct sys_reg_desc sys_reg_descs[] = {
+    ID_SANITISED(ID_AA64DFR0_EL1),
+    ID_UNALLOCATED(5,2),
+    ID_HIDDEN(ID_AA64AFR0_EL1),
+};
+```
+宏展开后：
+```c
+{ 
+    .name = "SYS_ID_AA64DFR0_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((0) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((0) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((0) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((0) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((0) << 5))) >> 5) & 0x7), 
+    .access = access_id_reg, 
+    .get_user = get_id_reg, 
+    .set_user = set_id_reg, 
+    .visibility = id_visibility, 
+},
+{ 
+    .Op0 = 3, 
+    .Op1 = 0, 
+    .CRn = 0, 
+    .CRm = 5, 
+    .Op2 = 2, 
+    .access = access_raz_id_reg, 
+    .get_user = get_raz_id_reg, 
+    .set_user = set_raz_id_reg, 
+},
+{ 
+    .name = "SYS_ID_AA64AFR0_EL1", 
+    .Op0 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((4) << 5))) >> 19) & 0x3), 
+    .Op1 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((4) << 5))) >> 16) & 0x7), 
+    .CRn = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((4) << 5))) >> 12) & 0xf), 
+    .CRm = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((4) << 5))) >> 8) & 0xf), 
+    .Op2 = ((((((3) << 19) | ((0) << 16) | ((0) << 12) | ((5) << 8) | ((4) << 5))) >> 5) & 0x7), 
+    .access = access_raz_id_reg, 
+    .get_user = get_raz_id_reg, 
+    .set_user = set_raz_id_reg, 
+},
+```
+
+
+# 6. arch_time
+
+```c
+static bool access_arch_timer(struct kvm_vcpu *vcpu,
+                  struct sys_reg_params *p,
+                  const struct sys_reg_desc *r)
+{
+    enum kvm_arch_timers tmr;
+    enum kvm_arch_timer_regs treg;
+    u64 reg = reg_to_encoding(r);
+
+    switch (reg) {
+    case SYS_CNTP_TVAL_EL0:
+    case SYS_AARCH32_CNTP_TVAL:
+        tmr = TIMER_PTIMER;
+        treg = TIMER_REG_TVAL;
+        break;
+    case SYS_CNTP_CTL_EL0:
+    case SYS_AARCH32_CNTP_CTL:
+        tmr = TIMER_PTIMER;
+        treg = TIMER_REG_CTL;
+        break;
+    case SYS_CNTP_CVAL_EL0:
+    case SYS_AARCH32_CNTP_CVAL:
+        tmr = TIMER_PTIMER;
+        treg = TIMER_REG_CVAL;
+        break;
+    default:
+        BUG();
+    }
+
+    if (p->is_write)
+        kvm_arm_timer_write_sysreg(vcpu, tmr, treg, p->regval);
+    else
+        p->regval = kvm_arm_timer_read_sysreg(vcpu, tmr, treg);
+
+    return true;
+}
+
+#define SYS_CNTP_TVAL_EL0       sys_reg(3, 3, 14, 2, 0)
+#define SYS_CNTP_CTL_EL0        sys_reg(3, 3, 14, 2, 1)
+#define SYS_CNTP_CVAL_EL0       sys_reg(3, 3, 14, 2, 2)
+
+static const struct sys_reg_desc sys_reg_descs[] = {
+    { SYS_DESC(SYS_CNTP_TVAL_EL0), access_arch_timer },
+    { SYS_DESC(SYS_CNTP_CTL_EL0), access_arch_timer },
+    { SYS_DESC(SYS_CNTP_CVAL_EL0), access_arch_timer },
+};
+```
