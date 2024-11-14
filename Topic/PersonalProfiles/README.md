@@ -418,6 +418,13 @@ qemu-system-aarch64 -machine virt,gic-version=3,its=on -cpu cortex-a72 -accel tc
 -drive file=guest.img,id=fs,if=none \
 -device virtio-blk-device,drive=fs \
 -append "earlyprintk console=ttyAMA0 rootwait root=/dev/vda rw nokaslr"
+
+gdb-multiarch -ex "set debug auto-load on"             \
+    -ex "add-auto-load-safe-path /root/linux/scripts/gdb"          \
+    -ex "file vmlinux"                       \
+    -ex "target remote localhost:1234"       \
+    -ex "break start_kernel"          \
+    -ex "continue"                           \
 ```
 
 
