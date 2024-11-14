@@ -486,3 +486,20 @@ for root_port in $root_port_list; do
     lspci -vvv -s $root_port | grep 'LnkCap' | awk -F ',' '{print $2 $3}'
 done
 ```
+
+Add useful OpenMP environment variables:
+```
+# Optimize OpenMP performance behavious
+export OMP_SCHEDULE=static  # Disable dynamic loop scheduling
+export OMP_PROC_BIND=TRUE   # Bind threads to specific resources
+export OMP_DYNAMIC=false    # Disable dynamic thread pool sizing
+
+# turns on display of OMP's internal control variables
+export OMP_DISPLAY_ENV=true
+
+# display the affinity of each OMP thread
+export OMP_DISPLAY_AFFINITY=true
+
+# controls the format of the thread affinityexport
+OMP_AFFINITY_FORMAT="Thread Affinity: %0.3L %.8n %.15{thread_affinity} %.12H"
+```
