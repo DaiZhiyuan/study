@@ -522,5 +522,12 @@ qemu-system-aarch64 -machine virt,gic-version=3,iommu=smmuv3,its=on -cpu cortex-
 -nographic \
 -net nic -net tap,ifname=tap0,script=no,downscript=no,vhost=on
 -monitor telnet:localhost:4444,server,nowait -S
+
+qemu-system-aarch64 -machine virt,gic-version=3,its=on -cpu cortex-a72 -accel tcg -smp 1 -m 512 \
+-nographic \
+-kernel Image  \
+-drive file=guest.img,id=fs,if=none \
+-device virtio-blk-device,drive=fs \
+-append "earlyprintk console=ttyAMA0 rootwait root=/dev/vda rw nokaslr"
 ```
 
