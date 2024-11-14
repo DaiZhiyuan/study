@@ -513,3 +513,14 @@ else
     PS1='● '
 ```
 
+QEMU command line:
+```
+qemu-system-aarch64 -machine virt,gic-version=3,iommu=smmuv3,its=on -cpu cortex-a72 -accel tcg \
+-smp 2 -m 2048 \
+-bios /usr/share/qemu-efi-aarch64/QEMU_EFI.fd \
+-hda vdisk.qcow2 \
+-nographic \
+-net nic -net tap,ifname=tap0,script=no,downscript=no,vhost=on
+-monitor telnet:localhost:4444,server,nowait -S
+```
+
