@@ -159,7 +159,7 @@ int main(void)
 
 ARMv8-A(aarch64) | AMD64(IA32e)
 ---|---
-\_\_x86\_64\_\_ | \_\_aarch64\_\_
+\_\_aarch64\_\_ | \_\_x86\_64\_\_ 
 
 Example:
 ```c
