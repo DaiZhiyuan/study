@@ -8,6 +8,14 @@
 
 #define PMEM_PATH "/dev/dax0.0"
 
+/*
+Program Output:
+    Mapped /dev/dax0.0 to address 0x7ff099e00000 with size 1054867456 bytes.
+    Successfully wrote data and persisted to PMEM.
+    Data read from PMEM: "Hello from libpmem2!"
+    Cleaned up resources.
+*/
+
 int main(int argc, char *argv[])
 {
     int fd;
