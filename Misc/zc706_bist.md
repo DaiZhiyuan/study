@@ -1,5 +1,9 @@
 #  Xilinx Zynq-7000 AP SoC ZC706 Evaluation Kit (BIST)
 
+![Design Default view](zc706_bist_design_default_view.png)
+
+![Design Interface View](zc706_bist_design_interface_view.png)
+
 ```
 ********************************************************
 ********************************************************
