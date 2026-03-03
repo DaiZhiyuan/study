@@ -158,11 +158,17 @@ let Tlist_Exit_OnlyWindow = 1
 .gitconfig
 ```
 [user]
-    name = Daizhiyuan
+    name = "Zhiyuan Dai"
     email = daizhiyuan@phytium.com.cn
 [core]
     quotepath = false
     editor = vim
+[sendemail]
+    smtpserver = smtp.phytium.com.cn
+    smtpserverport = 465
+    smtpencryption = ssl
+    smtpuser = daizhiyuan@phytium.com.cn
+    smtppass = utAFEtSsZP56cG__
 [credential]
     helper = store
 [color]
@@ -174,15 +180,19 @@ let Tlist_Exit_OnlyWindow = 1
 [push]
     default = current
 [alias]
-    logo = log --graph --pretty=oneline
-    logs = log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
-    logl = log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit -
--all
+    logo = log --pretty=oneline --no-merges
+    logs = log --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --no-mer
+ges
+    logl = log --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --all --
+no-merges
 [init]
         defaultBranch = main
 [http]
         version = HTTP/1.1
         postBuffer = 157286400
+    sslVerify = false
+[safe]
+    directory = /home/jerrydai/linux
 ```
 
 .bashrc
